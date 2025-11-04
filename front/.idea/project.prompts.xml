@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PromptTemplates">
+    <option name="builtInPromptOverrides">
+      <list>
+        <BuiltInPromptOverride>
+          <option name="groupId" value="rules" />
+          <option name="promptId" value="project" />
+          <option name="text" value="Todas as resposta sejam em portugues brasileiro, explicando o codigo com detalhes e direto, alem de alguma situaçao de criaçao de layout, que mostre um comentario e seja que esse estilo&#10;&#10;&#10;_____________________________________&#10; |   (ROW)       |     (ROW)     |&#10; |   (Column1)   |    (Column3)  |&#10; |   (Column2)   |    (Column4)  |&#10; __________________________________" />
+        </BuiltInPromptOverride>
+      </list>
+    </option>
+  </component>
+</project>
