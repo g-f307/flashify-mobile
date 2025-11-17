@@ -7,46 +7,144 @@ import com.example.flashify.model.network.Api
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import retrofit2.HttpException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
-// Define os possíveis estados da nossa UI
 sealed class RegisterUIState {
-    object Idle : RegisterUIState() // Estado inicial
-    object Loading : RegisterUIState() // A carregar
-    data class Success(val message: String) : RegisterUIState() // Sucesso
-    data class Error(val message: String) : RegisterUIState() // Erro
+    object Idle : RegisterUIState()
+    object Loading : RegisterUIState()
+    data class Success(val message: String) : RegisterUIState()
+    data class Error(
+        val message: String,
+        val field: String? = null // Campo específico com erro
+    ) : RegisterUIState()
 }
 
 class RegisterViewModel : ViewModel() {
 
-    // Estado privado que só o ViewModel pode modificar
     private val _registerState = MutableStateFlow<RegisterUIState>(RegisterUIState.Idle)
-    // Estado público que a UI pode observar para se atualizar
     val registerState: StateFlow<RegisterUIState> = _registerState
 
     fun registerUser(username: String, email: String, password: String) {
-        // Inicia uma coroutine segura no escopo do ViewModel
         viewModelScope.launch {
-            // 1. Mude o estado para Loading (a UI vai mostrar um spinner)
             _registerState.value = RegisterUIState.Loading
 
             try {
-                // 2. Crie o objeto de pedido com os dados da UI
                 val userRequest = UserCreateRequest(
                     username = username,
                     email = email,
                     password = password
                 )
 
-                // 3. Chame a ApiService (a ponte para o nosso back-end)
                 val response = Api.retrofitService.registerUser(userRequest)
 
-                // 4. Se correu bem, mude o estado para Success
-                _registerState.value = RegisterUIState.Success("Utilizador ${response.username} criado com sucesso!")
+                _registerState.value = RegisterUIState.Success(
+                    "Conta criada com sucesso! Faça login para continuar."
+                )
 
             } catch (e: Exception) {
-                // 5. Se deu erro, mude o estado para Error
-                _registerState.value = RegisterUIState.Error(e.message ?: "Ocorreu um erro desconhecido")
+                val (message, field) = when (e) {
+                    is HttpException -> {
+                        when (e.code()) {
+                            400 -> {
+                                // Tenta extrair detalhes do erro do corpo da resposta
+                                try {
+                                    val errorBody = e.response()?.errorBody()?.string()
+                                    if (errorBody != null) {
+                                        val json = JSONObject(errorBody)
+                                        val detail = json.optString("detail", "")
+
+                                        when {
+                                            detail.contains("username", ignoreCase = true) -> {
+                                                Pair(
+                                                    "Este nome de usuário já está em uso",
+                                                    "username"
+                                                )
+                                            }
+                                            detail.contains("email", ignoreCase = true) -> {
+                                                Pair(
+                                                    "Este email já está cadastrado",
+                                                    "email"
+                                                )
+                                            }
+                                            detail.contains("password", ignoreCase = true) -> {
+                                                Pair(
+                                                    "A senha não atende aos requisitos mínimos",
+                                                    "password"
+                                                )
+                                            }
+                                            else -> {
+                                                Pair(detail, null)
+                                            }
+                                        }
+                                    } else {
+                                        Pair("Dados inválidos. Verifique as informações.", null)
+                                    }
+                                } catch (jsonException: Exception) {
+                                    Pair("Erro ao processar resposta do servidor", null)
+                                }
+                            }
+                            409 -> {
+                                // Conflito - geralmente usuário ou email já existe
+                                val errorBody = e.response()?.errorBody()?.string()
+                                if (errorBody?.contains("username", ignoreCase = true) == true) {
+                                    Pair(
+                                        "Este nome de usuário já está em uso",
+                                        "username"
+                                    )
+                                } else {
+                                    Pair(
+                                        "Este email já está cadastrado",
+                                        "email"
+                                    )
+                                }
+                            }
+                            422 -> {
+                                Pair(
+                                    "Dados inválidos. Verifique o formato dos campos.",
+                                    null
+                                )
+                            }
+                            500, 502, 503 -> {
+                                Pair(
+                                    "Erro no servidor. Tente novamente mais tarde.",
+                                    null
+                                )
+                            }
+                            else -> {
+                                Pair("Erro ao criar conta: ${e.message()}", null)
+                            }
+                        }
+                    }
+                    is UnknownHostException, is ConnectException -> {
+                        Pair(
+                            "Sem conexão com a internet. Verifique sua rede.",
+                            null
+                        )
+                    }
+                    is SocketTimeoutException -> {
+                        Pair(
+                            "Tempo de conexão esgotado. Tente novamente.",
+                            null
+                        )
+                    }
+                    else -> {
+                        Pair(
+                            e.message ?: "Erro desconhecido ao criar conta",
+                            null
+                        )
+                    }
+                }
+
+                _registerState.value = RegisterUIState.Error(message, field)
             }
         }
+    }
+
+    fun resetState() {
+        _registerState.value = RegisterUIState.Idle
     }
 }

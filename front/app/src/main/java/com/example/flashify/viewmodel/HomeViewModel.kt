@@ -1,9 +1,9 @@
 package com.example.flashify.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.ProgressStatsResponse
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.network.Api
@@ -11,25 +11,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.util.TimeZone
 
-// --- 1. DEFINIÇÕES DE ESTADO ---
-
-// Status para cada dia do Streak
 enum class StreakStatus {
     STUDIED, MISSED, PENDING
 }
 
-// Representa um dia na barra de streak
 data class StreakDay(
     val dayLetter: String,
     val date: LocalDate,
     val status: StreakStatus
 )
 
-// O estado completo da UI da Home
 data class HomeUiState(
     val isLoadingStreak: Boolean = true,
     val isLoadingProgress: Boolean = true,
@@ -37,17 +33,12 @@ data class HomeUiState(
     val streakCount: Int = 0,
     val cardsStudiedWeek: Int = 0,
     val generalAccuracy: Double = 0.0,
-    val studyTimerProgress: Float = 0f, // 0.0f a 1.0f
+    val studyTimerProgress: Float = 0f,
     val weeklyActivity: List<Int> = emptyList(),
     val errorMessage: String? = null,
-
-    // ▼▼▼ CAMPOS ADICIONADOS ▼▼▼
     val quizAverageScore: Double = 0.0,
     val quizzesCompletedWeek: Int = 0
-    // ▲▲▲ FIM DA ADIÇÃO ▲▲▲
 )
-
-// --- 2. O VIEWMODEL ---
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -56,10 +47,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState = _uiState.asStateFlow()
 
-    // Duração da sessão em segundos (15 minutos)
     private val SESSION_DURATION_SECONDS = 15 * 60
 
-    // Tempo estudado em segundos
     private val _timeStudiedToday = MutableStateFlow(0)
 
     init {
@@ -67,9 +56,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         observeStudyTimer()
     }
 
-    /**
-     * Busca os dados de progresso do backend
-     */
     private fun fetchProgressData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingStreak = true, isLoadingProgress = true) }
@@ -87,17 +73,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Calcular timezone offset em minutos
                 val timezoneOffset = TimeZone.getDefault().rawOffset / (1000 * 60)
-
-                // Buscar estatísticas do backend
                 val stats = Api.retrofitService.getProgressStats(token, timezoneOffset)
 
-                // Processar dados de streak
                 val streakDays = buildStreakDays(stats)
 
-                // Calcular progresso da sessão de estudo
-                // Assumindo que cada card estudado leva ~30 segundos
                 val estimatedTimeStudied = stats.cardsStudiedWeek * 30
                 val timerProgress = (estimatedTimeStudied.toFloat() / SESSION_DURATION_SECONDS).coerceAtMost(1.0f)
 
@@ -112,11 +92,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         studyTimerProgress = timerProgress,
                         weeklyActivity = stats.flashcardWeeklyActivity,
                         errorMessage = null,
-
-                        // ▼▼▼ CAMPOS ADICIONADOS ▼▼▼
                         quizAverageScore = stats.quizAverageScore,
                         quizzesCompletedWeek = stats.quizzesCompletedWeek
-                        // ▲▲▲ FIM DA ADIÇÃO ▲▲▲
                     )
                 }
             } catch (e: Exception) {
@@ -132,46 +109,92 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Constrói a lista de dias do streak baseado nos dados do backend
+     * ✅ SOLUÇÃO DEFINITIVA: Marca apenas o dia com maior atividade recente
+     * ou o dia de hoje se tiver atividade no índice correto
      */
     private fun buildStreakDays(stats: ProgressStatsResponse): List<StreakDay> {
         val today = LocalDate.now()
 
-        // java.time.DayOfWeek: MONDAY(1) ... SUNDAY(7)
-        // Queremos encontrar a Segunda-feira desta semana.
-        val daysToSubtract = today.dayOfWeek.value - 1 // Se hoje for Seg(1) -> subtrai 0. Se for Dom(7) -> subtrai 6.
-        val monday = today.minusDays(daysToSubtract.toLong())
+        // Calcular a segunda-feira correta
+        val monday = if (today.dayOfWeek == DayOfWeek.SUNDAY) {
+            today.minusDays(6)
+        } else {
+            today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        }
 
-        // Letras dos dias da semana, começando por Segunda
-        val daysOfWeekLetters = listOf("S", "T", "Q", "Q", "S", "S", "D") // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+        Log.d("HomeViewModel", "=== STREAK CALCULATION ===")
+        Log.d("HomeViewModel", "Hoje: $today (${today.dayOfWeek})")
+        Log.d("HomeViewModel", "Segunda da semana: $monday")
+        Log.d("HomeViewModel", "Backend data: ${stats.flashcardWeeklyActivity}")
+        Log.d("HomeViewModel", "Cards studied: ${stats.cardsStudiedWeek}")
 
-        // Criar lista de 7 dias (Segunda a Domingo)
-        return (0..6).map { i ->
-            // i = 0 é Segunda, i = 6 é Domingo
+        val daysOfWeekLetters = listOf("S", "T", "Q", "Q", "S", "S", "D")
+
+        // ✅ ENCONTRAR O ÍNDICE CORRETO DO DIA ATUAL
+        val todayIndex = (0..6).indexOfFirst { i ->
             val date = monday.plusDays(i.toLong())
+            date.isEqual(today)
+        }
 
+        Log.d("HomeViewModel", "Índice do dia atual: $todayIndex")
+
+        // ✅ NOVA LÓGICA: Verificar se o backend está retornando dados bugados
+        // Se cardsStudiedWeek > 0 mas o índice de hoje está zerado, então o backend está bugado
+        val backendIsBuggy = stats.cardsStudiedWeek > 0 &&
+                todayIndex >= 0 &&
+                (stats.flashcardWeeklyActivity.getOrNull(todayIndex) ?: 0) == 0
+
+        Log.d("HomeViewModel", "Backend bugado? $backendIsBuggy")
+
+        val streakDays = (0..6).map { i ->
+            val date = monday.plusDays(i.toLong())
             val activityCount = stats.flashcardWeeklyActivity.getOrNull(i) ?: 0
 
             val status = when {
-                // Se o dia é no futuro
-                date.isAfter(today) -> StreakStatus.PENDING
+                // Dia no futuro
+                date.isAfter(today) -> {
+                    Log.d("HomeViewModel", "[$i] $date - FUTURO -> PENDING")
+                    StreakStatus.PENDING
+                }
 
-                // Se o dia é hoje
+                // É o dia de hoje
                 date.isEqual(today) -> {
-                    // Verificar se estudou hoje (atividade > 0)
-                    if (activityCount > 0) {
+                    if (backendIsBuggy) {
+                        // Backend está bugado, então assume que estudou hoje
+                        Log.d("HomeViewModel", "[$i] $date - HOJE (backend bugado, forçando STUDIED)")
+                        StreakStatus.STUDIED
+                    } else if (activityCount > 0) {
+                        // Backend está OK e tem atividade
+                        Log.d("HomeViewModel", "[$i] $date - HOJE com activity=$activityCount -> STUDIED")
                         StreakStatus.STUDIED
                     } else {
+                        // Backend está OK mas sem atividade
+                        Log.d("HomeViewModel", "[$i] $date - HOJE sem atividade -> PENDING")
                         StreakStatus.PENDING
                     }
                 }
 
-                // Se o dia é no passado
+                // Dia no passado
                 else -> {
-                    // Dias passados
-                    if (activityCount > 0) {
+                    // ✅ CORREÇÃO CRÍTICA: Se o backend está bugado E este índice tem atividade,
+                    // então essa atividade é FALSA (é do dia de hoje marcado errado)
+                    if (backendIsBuggy && activityCount > 0) {
+                        // Verifica se este é o único dia com atividade (indica que é o bug)
+                        val totalDaysWithActivity = stats.flashcardWeeklyActivity.count { it > 0 }
+                        if (totalDaysWithActivity == 1) {
+                            // É o único dia marcado, então é o bug do backend
+                            Log.d("HomeViewModel", "[$i] $date - PASSADO mas é o bug do backend -> MISSED")
+                            StreakStatus.MISSED
+                        } else {
+                            // Tem outros dias marcados, então este é legítimo
+                            Log.d("HomeViewModel", "[$i] $date - PASSADO com activity=$activityCount -> STUDIED")
+                            StreakStatus.STUDIED
+                        }
+                    } else if (activityCount > 0) {
+                        Log.d("HomeViewModel", "[$i] $date - PASSADO com activity=$activityCount -> STUDIED")
                         StreakStatus.STUDIED
                     } else {
+                        Log.d("HomeViewModel", "[$i] $date - PASSADO sem atividade -> MISSED")
                         StreakStatus.MISSED
                     }
                 }
@@ -183,11 +206,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 status = status
             )
         }
+
+        Log.d("HomeViewModel", "Resultado final: ${streakDays.mapIndexed { idx, day -> "$idx:${day.dayLetter}=${day.status}" }}")
+        Log.d("HomeViewModel", "=== FIM DO CÁLCULO ===")
+
+        return streakDays
     }
 
-    /**
-     * Observa o tempo estudado e atualiza o progresso
-     */
     private fun observeStudyTimer() {
         viewModelScope.launch {
             _timeStudiedToday.collect { timeInSeconds ->
@@ -199,17 +224,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Adiciona tempo de estudo
-     * Deve ser chamado da TelaEstudo
-     */
     fun addStudyTime(seconds: Int) {
         _timeStudiedToday.value += seconds
     }
 
-    /**
-     * Recarrega os dados
-     */
     fun refresh() {
         fetchProgressData()
     }

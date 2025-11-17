@@ -54,6 +54,10 @@ fun TelaCriacaoFlashCard(
     var creationMode by remember { mutableStateOf("text") }
     var includeQuiz by remember { mutableStateOf(false) }
 
+    // ✅ NOVOS ESTADOS PARA CUSTOMIZAÇÃO DE QUIZ
+    var quizQuantity by remember { mutableStateOf(5f) }
+    var difficulty by remember { mutableStateOf("Médio") }
+
     val creationState by viewModel.deckCreationState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -235,7 +239,11 @@ fun TelaCriacaoFlashCard(
                     )
                     4 -> StepOptions(
                         includeQuiz = includeQuiz,
-                        onIncludeQuizChange = { includeQuiz = it }
+                        onIncludeQuizChange = { includeQuiz = it },
+                        quizQuantity = quizQuantity,
+                        onQuizQuantityChange = { quizQuantity = it },
+                        difficulty = difficulty,
+                        onDifficultyChange = { difficulty = it }
                     )
                 }
 
@@ -283,6 +291,7 @@ fun TelaCriacaoFlashCard(
                                         text = contentText,
                                         quantity = flashcardQuantity.roundToInt(),
                                         generateQuiz = includeQuiz,
+                                        numQuestions = quizQuantity.roundToInt(),
                                         folderId = folderId
                                     )
                                 } else {
@@ -292,6 +301,7 @@ fun TelaCriacaoFlashCard(
                                             fileUri = uri,
                                             quantity = flashcardQuantity.roundToInt(),
                                             generateQuiz = includeQuiz,
+                                            numQuestions = quizQuantity.roundToInt(),
                                             folderId = folderId
                                         )
                                     }
@@ -769,8 +779,8 @@ fun StepQuantity(
             Slider(
                 value = flashcardQuantity,
                 onValueChange = onQuantityChange,
-                valueRange = 5f..50f,
-                steps = 44,
+                valueRange = 5f..20f,  // ✅ ALTERADO DE 50f PARA 20f
+                steps = 14,             // ✅ ALTERADO DE 44 PARA 14 (5 a 20 = 15 valores, -1 = 14 steps)
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = YellowAccent,
@@ -790,7 +800,7 @@ fun StepQuantity(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    "50 máximo",
+                    "20 máximo",  // ✅ ALTERADO DE "50 máximo" PARA "20 máximo"
                     color = TextSecondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
@@ -830,7 +840,11 @@ fun StepQuantity(
 @Composable
 fun StepOptions(
     includeQuiz: Boolean,
-    onIncludeQuizChange: (Boolean) -> Unit
+    onIncludeQuizChange: (Boolean) -> Unit,
+    quizQuantity: Float,
+    onQuizQuantityChange: (Float) -> Unit,
+    difficulty: String,
+    onDifficultyChange: (String) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -949,36 +963,142 @@ fun StepOptions(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Color(0xFF00BCD4).copy(alpha = 0.1f),
-                        RoundedCornerShape(10.dp)
-                    )
-                    .padding(14.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(
-                    Icons.Default.Lightbulb,
-                    contentDescription = null,
-                    tint = Color(0xFF00BCD4),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    "O quiz será gerado automaticamente com base no conteúdo dos flashcards, perfeito para testar seu conhecimento!",
-                    fontSize = 13.sp,
-                    color = TextSecondary,
-                    lineHeight = 18.sp,
-                    letterSpacing = 0.2.sp
-                )
-            }
-
+            // ✅ SEÇÃO DE CUSTOMIZAÇÃO DO QUIZ (APARECE QUANDO includeQuiz É TRUE)
             if (includeQuiz) {
+                Spacer(Modifier.height(24.dp))
+
+                // Quantidade de Perguntas
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            YellowAccent.copy(alpha = 0.05f),
+                            RoundedCornerShape(16.dp)
+                        )
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Numbers,
+                                contentDescription = null,
+                                tint = YellowAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "Perguntas do Quiz",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Text(
+                            "${quizQuantity.roundToInt()}",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = YellowAccent
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Slider(
+                        value = quizQuantity,
+                        onValueChange = onQuizQuantityChange,
+                        valueRange = 3f..15f,
+                        steps = 11,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = YellowAccent,
+                            activeTrackColor = YellowAccent,
+                            inactiveTrackColor = Color.Gray.copy(alpha = 0.2f)
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "3 mínimo",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            "15 máximo",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(16.dp))
+
+                // Nível de Dificuldade
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            YellowAccent.copy(alpha = 0.05f),
+                            RoundedCornerShape(16.dp)
+                        )
+                        .padding(20.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.TrendingUp,
+                            contentDescription = null,
+                            tint = YellowAccent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "Nível de Dificuldade",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        DifficultyButton(
+                            label = "Fácil",
+                            icon = Icons.Default.SentimentSatisfied,
+                            selected = difficulty == "Fácil",
+                            onClick = { onDifficultyChange("Fácil") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        DifficultyButton(
+                            label = "Médio",
+                            icon = Icons.Default.RemoveCircleOutline,
+                            selected = difficulty == "Médio",
+                            onClick = { onDifficultyChange("Médio") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        DifficultyButton(
+                            label = "Difícil",
+                            icon = Icons.Default.Whatshot,
+                            selected = difficulty == "Difícil",
+                            onClick = { onDifficultyChange("Difícil") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -997,11 +1117,39 @@ fun StepOptions(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Quiz ativado! Prepare-se para testar seu conhecimento",
+                        "Quiz configurado! ${quizQuantity.roundToInt()} perguntas em nível $difficulty",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                         lineHeight = 18.sp
+                    )
+                }
+            } else {
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color(0xFF00BCD4).copy(alpha = 0.1f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Default.Lightbulb,
+                        contentDescription = null,
+                        tint = Color(0xFF00BCD4),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "O quiz será gerado automaticamente com base no conteúdo dos flashcards, perfeito para testar seu conhecimento!",
+                        fontSize = 13.sp,
+                        color = TextSecondary,
+                        lineHeight = 18.sp,
+                        letterSpacing = 0.2.sp
                     )
                 }
             }
@@ -1072,6 +1220,57 @@ fun ModeButton(
                 else
                     TextSecondary,
                 letterSpacing = 0.3.sp
+            )
+        }
+    }
+}
+
+// ✅ NOVO COMPOSABLE PARA BOTÕES DE DIFICULDADE
+@Composable
+fun DifficultyButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(80.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected)
+                YellowAccent.copy(alpha = 0.2f)
+            else
+                MaterialTheme.colorScheme.background.copy(alpha = 0.5f)
+        ),
+        border = BorderStroke(
+            width = 2.dp,
+            color = if (selected) YellowAccent else Color.Gray.copy(alpha = 0.3f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (selected) YellowAccent else Color.Gray,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                label,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected)
+                    MaterialTheme.colorScheme.onSurface
+                else
+                    TextSecondary
             )
         }
     }

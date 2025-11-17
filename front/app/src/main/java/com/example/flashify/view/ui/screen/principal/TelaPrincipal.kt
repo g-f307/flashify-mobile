@@ -16,11 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-// 👇 IMPORTAÇÕES ADICIONADAS
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-// -------------------------
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,7 +44,6 @@ fun TelaPrincipal(
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsState()
 
-    // ▼▼▼ BLOCO DE CÓDIGO ATUALIZADO ▼▼▼
     // Observa o ciclo de vida da tela para recarregar os dados
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -67,7 +64,6 @@ fun TelaPrincipal(
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
-    // ▲▲▲ FIM DO BLOCO ATUALIZADO ▲▲▲
 
     // Lógica da barra de navegação
     var selectedItem by remember { mutableStateOf(0) }
