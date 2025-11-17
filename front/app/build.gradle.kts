@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
-
 }
 
 android {
@@ -44,9 +43,8 @@ android {
 val room_version = "2.8.1"
 val lifecycle_version = "2.6.2"
 
-
 dependencies {
-
+    // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -55,6 +53,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.foundation)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -63,47 +64,36 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // Adicionando as dependências necessárias
-
-    implementation(libs.androidx.core.ktx.v1131)
-    implementation(libs.androidx.lifecycle.runtime.ktx.v281)
-    implementation(libs.androidx.activity.compose.v190)
-    implementation(libs.androidx.compose.bom.v20240500)
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
+    // Compose Material Icons
     implementation(libs.androidx.compose.material.icons.extended)
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.9.4")
 
-    // Para fazer os pedidos HTTP de forma fácil
+    // Networking
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
-// Gson para converter automaticamente os dados JSON da sua API em objeto Kotlin
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Implementação da biblioteca necessária para utilizar o android room
-    implementation("androidx.room:room-runtime:${room_version}")
-    // Api que ajuda a facilitar o uso do android room
+    // Room Database
+    implementation("androidx.room:room-runtime:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
 
-    // Extensão com uso de Corrotinas para Kotlin
-    implementation("androidx.room:room-ktx:${room_version}")
-
-    //ViewModel e LiveData/StateFlow
+    // ViewModel e Lifecycle
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version")
-
-    // Para testes:
     implementation("androidx.activity:activity-compose:1.8.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
 
+    // ===== GOOGLE SIGN-IN - ADICIONE ESTAS LINHAS =====
 
-    //HTTP
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    // Gson para converter automaticamente os dados JSON da sua API em objeto Kotlin
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // Google Play Services Auth
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Credential Manager (API moderna do Google)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
 
+    // Google ID para Credential Manager
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 }

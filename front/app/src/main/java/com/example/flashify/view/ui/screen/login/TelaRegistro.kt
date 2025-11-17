@@ -78,7 +78,7 @@ fun TelaRegistro(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Comece a transformar os seus textos em flashcards hoje mesmo.",
+                text = "Comece a estudar de forma mais inteligente e otimizada.",
                 fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -89,7 +89,7 @@ fun TelaRegistro(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Nome de utilizador") },
+                label = { Text("Usuário") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
@@ -100,7 +100,7 @@ fun TelaRegistro(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Email") },
+                label = { Text("E-mail") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
@@ -150,7 +150,7 @@ fun TelaRegistro(
 
             // Link para Iniciar Sessão
             ClickableText(
-                text = AnnotatedString("Já tem uma conta? Inicie sessão"),
+                text = AnnotatedString("Já tem uma conta? Faça login"),
                 onClick = { offset ->
                     navController.navigate(LOGIN_SCREEN_ROUTE) {
                         // Limpa a pilha de navegação para não empilhar telas de login/registo

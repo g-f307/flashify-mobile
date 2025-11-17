@@ -6,6 +6,8 @@ from ..models import AuthProvider
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, SQLModel
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from .. import crud, models, schemas, security
 from ..database import get_session
@@ -111,6 +113,97 @@ async def auth_google(
     
     jwt_token = security.create_access_token(subject=db_user.email)
     return {"access_token": jwt_token, "token_type": "bearer"}
+
+class GoogleIdTokenRequest(SQLModel):
+    """Requisição para login via ID Token (mobile)"""
+    id_token: str
+
+@router.post("/google/mobile", response_model=schemas.Token)
+async def auth_google_mobile(
+    token_request: GoogleIdTokenRequest,
+    session: Session = Depends(get_session)
+):
+    """
+    Endpoint para autenticação Google via ID Token (app mobile).
+    O app Android envia o ID Token diretamente, validado pelo SHA-1.
+    Não requer Client Secret porque a segurança vem do certificado SHA-1.
+    """
+    try:
+        # 1. Obter Client ID das variáveis de ambiente
+        google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+        if not google_client_id:
+            raise HTTPException(
+                status_code=500, 
+                detail="GOOGLE_CLIENT_ID não configurado no servidor"
+            )
+        
+        print(f"🔐 Validando ID Token com Client ID: {google_client_id[:20]}...")
+        
+        # 2. Validar o ID Token com o Google
+        # A biblioteca google-auth valida automaticamente:
+        # - Assinatura do token
+        # - Expiração
+        # - Emissor (Google)
+        # - Audience (seu Client ID)
+        idinfo = id_token.verify_oauth2_token(
+            token_request.id_token,
+            google_requests.Request(),
+            google_client_id
+        )
+        
+        # 3. Verificar emissor do token (segurança extra)
+        if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+            print(f"❌ Emissor inválido: {idinfo['iss']}")
+            raise HTTPException(status_code=400, detail="Token de origem inválida")
+        
+        # 4. Extrair informações do usuário
+        email = idinfo.get('email')
+        name = idinfo.get('name')
+        picture = idinfo.get('picture')
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email não encontrado no token")
+        
+        # Se não tiver nome, usa a parte antes do @ do email
+        if not name:
+            name = email.split('@')[0]
+        
+        print(f"✅ Usuário autenticado: {email} (Nome: {name})")
+        
+        # 5. Criar ou atualizar usuário no banco
+        db_user = crud.get_or_create_google_user(
+            session=session,
+            email=email,
+            username=name,
+            profile_picture_url=picture
+        )
+        
+        # 6. Gerar JWT token da nossa aplicação
+        jwt_token = security.create_access_token(subject=db_user.email)
+        
+        print(f"🎫 Token JWT gerado para: {db_user.email}")
+        
+        return {"access_token": jwt_token, "token_type": "bearer"}
+        
+    except ValueError as e:
+        # Token inválido, expirado ou com audience incorreta
+        print(f"❌ Erro de validação: {str(e)}")
+        raise HTTPException(
+            status_code=401,
+            detail=f"Token inválido ou expirado: {str(e)}"
+        )
+    except HTTPException:
+        # Re-lançar HTTPExceptions que já criamos
+        raise
+    except Exception as e:
+        # Qualquer outro erro inesperado
+        print(f"❌ Erro inesperado na autenticação: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno ao processar autenticação"
+        )
 
 @router.post("/users/me/change-password", status_code=status.HTTP_204_NO_CONTENT)
 def change_current_user_password(

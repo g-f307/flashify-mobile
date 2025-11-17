@@ -7,6 +7,7 @@ import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.DeckUpdateRequest
 import com.example.flashify.model.data.FlashcardResponse
 import com.example.flashify.model.data.FlashcardUpdateRequest
+import com.example.flashify.model.data.GoogleIdTokenRequest
 import com.example.flashify.model.data.ProgressStatsResponse
 import com.example.flashify.model.data.StudyLogRequest
 import com.example.flashify.model.data.TextDeckCreateRequest
@@ -21,7 +22,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 
-private const val BASE_URL = "http://192.168.137.101:9000/"
+private const val BASE_URL = "http://192.168.1.28:9000/"
 
 private val retrofit = Retrofit.Builder()
     .baseUrl(BASE_URL)
@@ -38,6 +39,11 @@ interface ApiService {
     suspend fun login(
         @Field("username") username: String,
         @Field("password") password: String
+    ): TokenResponse
+
+    @POST("google/mobile")
+    suspend fun loginWithGoogleMobile(
+        @Body request: GoogleIdTokenRequest
     ): TokenResponse
 
     @GET("users/me")
@@ -60,7 +66,8 @@ interface ApiService {
         @Part("generates_flashcards") generatesFlashcards: RequestBody,
         @Part("generates_quizzes") generatesQuizzes: RequestBody,
         @Part("content_type") contentType: RequestBody,
-        @Part("num_questions") numQuestions: RequestBody? = null
+        @Part("num_questions") numQuestions: RequestBody? = null,
+        @Part("folder_id") folderId: RequestBody? = null  // ✅ NOVO PARÂMETRO
     ): DeckResponse
 
     @GET("documents/{id}")

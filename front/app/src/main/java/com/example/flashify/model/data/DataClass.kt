@@ -56,10 +56,11 @@ data class TextDeckCreateRequest(
     val title: String,
     val num_flashcards: Int,
     val difficulty: String,
-    val generate_flashcards: Boolean = true,   // ✅ ADICIONADO
-    val generate_quizzes: Boolean = false,     // ✅ ADICIONADO
-    val content_type: String = "flashcards",   // ✅ ADICIONADO
-    val num_questions: Int = 5                 // ✅ ADICIONADO (padrão 5 questões)
+    val generate_flashcards: Boolean = true,
+    val generate_quizzes: Boolean = false,
+    val content_type: String = "flashcards",
+    val num_questions: Int = 5,
+    val folder_id: Int? = null  // ✅ NOVO CAMPO
 )
 
 data class UserCreateRequest(
@@ -266,4 +267,8 @@ data class QuizStatsResponse(
 data class DeckStatsResponse(
     val flashcards: FlashcardStatsResponse,
     val quiz: QuizStatsResponse?
+)
+
+data class GoogleIdTokenRequest(
+    @SerializedName("id_token") val idToken: String
 )

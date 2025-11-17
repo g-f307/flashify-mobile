@@ -189,7 +189,8 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
         text: String,
         quantity: Int,
         generateQuiz: Boolean = false,
-        numQuestions: Int = 5
+        numQuestions: Int = 5,
+        folderId: Int? = null  // ✅ NOVO PARÂMETRO
     ) {
         viewModelScope.launch {
             _deckCreationState.value = DeckCreationState.Loading
@@ -208,7 +209,8 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
                     generate_flashcards = true,
                     generate_quizzes = generateQuiz,
                     content_type = if (generateQuiz) "both" else "flashcards",
-                    num_questions = numQuestions
+                    num_questions = numQuestions,
+                    folder_id = folderId  // ✅ ADICIONAR AO REQUEST
                 )
                 val response = apiService.createDeckFromText(token, request)
                 _deckCreationState.value = DeckCreationState.Success(response)
@@ -224,7 +226,8 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
         fileUri: Uri,
         quantity: Int,
         generateQuiz: Boolean = false,
-        numQuestions: Int = 5
+        numQuestions: Int = 5,
+        folderId: Int? = null  // ✅ NOVO PARÂMETRO
     ) {
         viewModelScope.launch {
             _deckCreationState.value = DeckCreationState.Loading
@@ -246,6 +249,9 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
                 val generateQuizzesPart = generateQuiz.toString().toRequestBody(plainTextType)
                 val contentTypePart = (if (generateQuiz) "both" else "flashcards").toRequestBody(plainTextType)
                 val numQuestionsPart = numQuestions.toString().toRequestBody(plainTextType)
+
+                // ✅ ADICIONAR FOLDER_ID COMO PART
+                val folderIdPart = folderId?.toString()?.toRequestBody(plainTextType)
 
                 val inputStream: InputStream? = context.contentResolver.openInputStream(fileUri)
                 val fileBytes = inputStream?.readBytes()
@@ -270,7 +276,8 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
                     generatesFlashcards = generateFlashcardsPart,
                     generatesQuizzes = generateQuizzesPart,
                     contentType = contentTypePart,
-                    numQuestions = numQuestionsPart
+                    numQuestions = numQuestionsPart,
+                    folderId = folderIdPart  // ✅ PASSAR FOLDER_ID
                 )
 
                 _deckCreationState.value = DeckCreationState.Success(response)

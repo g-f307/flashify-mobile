@@ -71,9 +71,6 @@ fun AppNavigation() {
         composable(route = MAIN_SCREEN_ROUTE) {
             TelaPrincipal(navController = navController)
         }
-        composable(route = CREATE_FLASHCARD_ROUTE) {
-            TelaCriacaoFlashCard(navController = navController)
-        }
         composable(route = BIBLIOTECA_SCREEN_ROUTE){
             TelaPrincipalBiblioteca(navController)
         }
@@ -127,6 +124,23 @@ fun AppNavigation() {
                 )
             }
         }
+
+        composable(
+            route = "$CREATE_FLASHCARD_ROUTE?folderId={folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.IntType
+                    defaultValue = -1  // -1 significa "sem pasta" (criar na raiz)
+                }
+            )
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getInt("folderId") ?: -1
+            TelaCriacaoFlashCard(
+                navController = navController,
+                folderId = if (folderId == -1) null else folderId
+            )
+        }
+        
         composable(
             route = "$CONTENT_LOADER_ROUTE/{documentId}/{generatesFlashcards}/{generatesQuizzes}",
             arguments = listOf(

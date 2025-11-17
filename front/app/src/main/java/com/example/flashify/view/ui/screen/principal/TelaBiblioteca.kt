@@ -3,7 +3,6 @@ package com.example.flashify.view.ui.screen.principal
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,26 +49,31 @@ fun TelaPrincipalBiblioteca(
     val folderOperationState by folderViewModel.operationState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // Estados para diálogos
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var showEditDialog by remember { mutableStateOf(false) }
+    // Estados para diálogos de DECK
+    var showDeleteDeckDialog by remember { mutableStateOf(false) }
+    var showEditDeckDialog by remember { mutableStateOf(false) }
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var showMoveToPastaDialog by remember { mutableStateOf(false) }
     var deckToActOn by remember { mutableStateOf<DeckResponse?>(null) }
+
+    // ✅ NOVOS ESTADOS para diálogos de PASTA
+    var showEditFolderDialog by remember { mutableStateOf(false) }
+    var showDeleteFolderDialog by remember { mutableStateOf(false) }
+    var folderToActOn by remember { mutableStateOf<FolderWithDocumentsResponse?>(null) }
 
     // Carregar biblioteca ao iniciar
     LaunchedEffect(Unit) {
         folderViewModel.loadLibrary()
     }
 
-    // Feedback de ações
+    // Feedback de ações de deck
     LaunchedEffect(deckActionState) {
         when (val state = deckActionState) {
             is DeckActionState.Success -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
                 deckViewModel.resetActionState()
-                showDeleteDialog = false
-                showEditDialog = false
+                showDeleteDeckDialog = false
+                showEditDeckDialog = false
                 showMoveToPastaDialog = false
                 deckToActOn = null
                 folderViewModel.loadLibrary()
@@ -82,12 +86,17 @@ fun TelaPrincipalBiblioteca(
         }
     }
 
+    // Feedback de ações de pasta
     LaunchedEffect(folderOperationState) {
         when (val state = folderOperationState) {
             is FolderOperationState.Success -> {
                 Toast.makeText(context, "Operação realizada com sucesso", Toast.LENGTH_SHORT).show()
                 folderViewModel.resetOperationState()
                 showCreateFolderDialog = false
+                showEditFolderDialog = false
+                showDeleteFolderDialog = false
+                folderToActOn = null
+                folderViewModel.loadLibrary()
             }
             is FolderOperationState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
@@ -97,28 +106,70 @@ fun TelaPrincipalBiblioteca(
         }
     }
 
-    // Diálogos
-    if (showDeleteDialog && deckToActOn != null) {
+    // Diálogos de DECK
+    if (showDeleteDeckDialog && deckToActOn != null) {
         DeleteDeckDialog(
             deckName = deckToActOn!!.filePath,
             onConfirm = { deckViewModel.deleteDeck(deckToActOn!!.id) },
             onDismiss = {
-                showDeleteDialog = false
+                showDeleteDeckDialog = false
                 deckToActOn = null
             },
             isLoading = deckActionState is DeckActionState.Loading
         )
     }
 
-    if (showEditDialog && deckToActOn != null) {
+    if (showEditDeckDialog && deckToActOn != null) {
         EditDeckDialog(
             currentName = deckToActOn!!.filePath,
             onConfirm = { newName -> deckViewModel.renameDeck(deckToActOn!!.id, newName) },
             onDismiss = {
-                showEditDialog = false
+                showEditDeckDialog = false
                 deckToActOn = null
             },
             isLoading = deckActionState is DeckActionState.Loading
+        )
+    }
+
+    if (showMoveToPastaDialog && deckToActOn != null && libraryState is LibraryState.Success) {
+        MoveToPastaDialog(
+            folders = (libraryState as LibraryState.Success).library.folders,
+            currentFolderId = null,
+            onConfirm = { folderId -> deckViewModel.moveDeckToFolder(deckToActOn!!.id, folderId) },
+            onDismiss = {
+                showMoveToPastaDialog = false
+                deckToActOn = null
+            }
+        )
+    }
+
+    // ✅ NOVOS DIÁLOGOS DE PASTA
+    if (showEditFolderDialog && folderToActOn != null) {
+        EditFolderDialog(
+            currentName = folderToActOn!!.name,
+            onConfirm = { newName ->
+                folderViewModel.updateFolder(folderToActOn!!.id, newName)
+            },
+            onDismiss = {
+                showEditFolderDialog = false
+                folderToActOn = null
+            },
+            isLoading = folderOperationState is FolderOperationState.Loading
+        )
+    }
+
+    if (showDeleteFolderDialog && folderToActOn != null) {
+        DeleteFolderDialog(
+            folderName = folderToActOn!!.name,
+            deckCount = folderToActOn!!.documents.size,
+            onConfirm = { deleteDecks ->
+                folderViewModel.deleteFolder(folderToActOn!!.id, deleteDecks)
+            },
+            onDismiss = {
+                showDeleteFolderDialog = false
+                folderToActOn = null
+            },
+            isLoading = folderOperationState is FolderOperationState.Loading
         )
     }
 
@@ -126,17 +177,6 @@ fun TelaPrincipalBiblioteca(
         CreateFolderDialog(
             onConfirm = { folderName -> folderViewModel.createFolder(folderName) },
             onCancel = { showCreateFolderDialog = false }
-        )
-    }
-
-    if (showMoveToPastaDialog && deckToActOn != null && libraryState is LibraryState.Success) {
-        MoveToPastaDialog(
-            folders = (libraryState as LibraryState.Success).library.folders,
-            onConfirm = { folderId -> deckViewModel.moveDeckToFolder(deckToActOn!!.id, folderId) },
-            onDismiss = {
-                showMoveToPastaDialog = false
-                deckToActOn = null
-            }
         )
     }
 
@@ -257,7 +297,7 @@ fun TelaPrincipalBiblioteca(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Título e subtítulo
-                        item {
+                        item(key = "headerSection") {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
                                     "Sua Biblioteca",
@@ -277,7 +317,7 @@ fun TelaPrincipalBiblioteca(
                         }
 
                         // Botões de ação
-                        item {
+                        item(key = "actionButtons") {
                             Spacer(modifier = Modifier.height(8.dp))
                             ActionButtons(
                                 onCreateFolderClick = { showCreateFolderDialog = true },
@@ -287,7 +327,7 @@ fun TelaPrincipalBiblioteca(
 
                         // Seção de Pastas
                         if (state.library.folders.isNotEmpty()) {
-                            item {
+                            item(key = "foldersTitle") {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -316,18 +356,30 @@ fun TelaPrincipalBiblioteca(
                                 }
                             }
 
-                            items(state.library.folders, key = { it.id }) { folder ->
-                                FolderItem(
+                            // ✅ LISTA DE PASTAS COM MENU
+                            items(
+                                items = state.library.folders,
+                                key = { folder -> "Folder-${folder.id}" }
+                            ) { folder ->
+                                FolderItemWithMenu(
                                     folder = folder,
                                     onClick = {
                                         navController.navigate("$DETALHE_PASTA_ROUTE/${folder.id}/${folder.name}")
+                                    },
+                                    onEditClick = {
+                                        folderToActOn = folder
+                                        showEditFolderDialog = true
+                                    },
+                                    onDeleteClick = {
+                                        folderToActOn = folder
+                                        showDeleteFolderDialog = true
                                     }
                                 )
                             }
                         }
 
                         // Título dos Decks
-                        item {
+                        item(key = "decksTitle") {
                             Spacer(modifier = Modifier.height(16.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -360,11 +412,14 @@ fun TelaPrincipalBiblioteca(
 
                         // Lista de Decks
                         if (state.library.rootDocuments.isEmpty()) {
-                            item {
+                            item(key = "emptyState") {
                                 EmptyStateDecks(onCreateClick = { navController.navigate(CREATE_FLASHCARD_ROUTE) })
                             }
                         } else {
-                            items(state.library.rootDocuments, key = { it.id }) { deck ->
+                            items(
+                                items = state.library.rootDocuments,
+                                key = { deck -> "Deck-${deck.id}" }
+                            ) { deck ->
                                 DeckItemCard(
                                     deck = deck,
                                     onStudyClick = {
@@ -372,11 +427,11 @@ fun TelaPrincipalBiblioteca(
                                     },
                                     onEditClick = {
                                         deckToActOn = deck
-                                        showEditDialog = true
+                                        showEditDeckDialog = true
                                     },
                                     onDeleteClick = {
                                         deckToActOn = deck
-                                        showDeleteDialog = true
+                                        showDeleteDeckDialog = true
                                     },
                                     onMoveToPastaClick = {
                                         deckToActOn = deck
@@ -387,7 +442,7 @@ fun TelaPrincipalBiblioteca(
                         }
 
                         // Espaçamento final
-                        item { Spacer(Modifier.height(16.dp)) }
+                        item(key = "finalSpacer") { Spacer(Modifier.height(16.dp)) }
                     }
                 }
                 else -> {}
@@ -396,6 +451,533 @@ fun TelaPrincipalBiblioteca(
     }
 }
 
+// ✅ NOVO COMPONENTE: FolderItem COM MENU DE OPÇÕES
+@Composable
+fun FolderItemWithMenu(
+    folder: FolderWithDocumentsResponse,
+    onClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(18.dp)),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(YellowAccent.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = YellowAccent,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        folder.name,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        letterSpacing = 0.2.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "${folder.documents.size} deck${if (folder.documents.size != 1) "s" else ""}",
+                            color = TextSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // ✅ MENU DE OPÇÕES
+            Box {
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        "Opções",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Renomear",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onEditClick()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Edit,
+                                null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Excluir",
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onDeleteClick()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Delete,
+                                null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ✅ NOVO DIÁLOGO: Renomear Pasta
+@Composable
+fun EditFolderDialog(
+    currentName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean
+) {
+    var newName by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Renomear Pasta",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "Digite o novo nome:",
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Novo nome") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = YellowAccent,
+                        cursorColor = YellowAccent,
+                        focusedLabelColor = YellowAccent
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(newName) },
+                enabled = !isLoading && newName.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = YellowAccent),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.Black
+                    )
+                } else {
+                    Text(
+                        "Salvar",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading,
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    "Cancelar",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+// ✅ NOVO DIÁLOGO: Excluir Pasta
+@Composable
+fun DeleteFolderDialog(
+    folderName: String,
+    deckCount: Int,
+    onConfirm: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean
+) {
+    var deleteDecks by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                "Excluir Pasta",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "Tem certeza que deseja excluir a pasta:",
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                ) {
+                    Text(
+                        "\"$folderName\"",
+                        modifier = Modifier.padding(12.dp),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                if (deckCount > 0) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Esta pasta contém $deckCount deck${if (deckCount != 1) "s" else ""}.",
+                        fontSize = 13.sp,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { deleteDecks = !deleteDecks }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = deleteDecks,
+                            onCheckedChange = { deleteDecks = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.error,
+                                uncheckedColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                "Excluir os decks junto com a pasta",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                if (deleteDecks) "Os decks serão apagados permanentemente"
+                                else "Os decks serão movidos para a biblioteca",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(deleteDecks) },
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                ),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Text(
+                        "Excluir",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading,
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    "Cancelar",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+// ✅ ATUALIZADO: MoveToPastaDialog com currentFolderId
+@Composable
+fun MoveToPastaDialog(
+    folders: List<FolderWithDocumentsResponse>,
+    currentFolderId: Int?,
+    onConfirm: (Int?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedFolderId by remember { mutableStateOf<Int?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Mover para Pasta",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Selecione a pasta de destino:",
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(16.dp))
+
+                // Opção para raiz (sem pasta) - só aparece se não estiver na raiz
+                if (currentFolderId != null) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedFolderId = null },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selectedFolderId == null)
+                            YellowAccent.copy(alpha = 0.15f)
+                        else
+                            Color.Transparent,
+                        border = BorderStroke(
+                            1.dp,
+                            if (selectedFolderId == null)
+                                YellowAccent
+                            else
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedFolderId == null,
+                                onClick = { selectedFolderId = null },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = YellowAccent
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Icon(
+                                Icons.Default.Home,
+                                null,
+                                tint = if (selectedFolderId == null) YellowAccent else TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Raiz (sem pasta)",
+                                fontWeight = if (selectedFolderId == null) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedFolderId == null)
+                                    MaterialTheme.colorScheme.onSurface
+                                else
+                                    TextSecondary
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                // Lista de pastas (excluindo a pasta atual)
+                folders.filter { it.id != currentFolderId }.forEach { folder ->
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedFolderId = folder.id },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (selectedFolderId == folder.id)
+                            YellowAccent.copy(alpha = 0.15f)
+                        else
+                            Color.Transparent,
+                        border = BorderStroke(
+                            1.dp,
+                            if (selectedFolderId == folder.id)
+                                YellowAccent
+                            else
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedFolderId == folder.id,
+                                onClick = { selectedFolderId = folder.id },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = YellowAccent
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Icon(
+                                Icons.Default.Folder,
+                                null,
+                                tint = if (selectedFolderId == folder.id) YellowAccent else TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                folder.name,
+                                fontWeight = if (selectedFolderId == folder.id) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedFolderId == folder.id)
+                                    MaterialTheme.colorScheme.onSurface
+                                else
+                                    TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(selectedFolderId) },
+                colors = ButtonDefaults.buttonColors(containerColor = YellowAccent),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    "Mover",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    "Cancelar",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+// Componentes que já existiam no seu código (mantidos iguais)
 @Composable
 fun ActionButtons(
     onCreateFolderClick: () -> Unit,
@@ -518,89 +1100,6 @@ fun EmptyStateDecks(onCreateClick: () -> Unit) {
                     color = Color.Black,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun FolderItem(folder: FolderWithDocumentsResponse, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(YellowAccent.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = null,
-                        tint = YellowAccent,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-                Spacer(Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        folder.name,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        letterSpacing = 0.2.sp
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Description,
-                            contentDescription = null,
-                            tint = TextSecondary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "${folder.documents.size} deck${if (folder.documents.size != 1) "s" else ""}",
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(YellowAccent.copy(alpha = 0.2f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "Abrir",
-                    tint = YellowAccent,
-                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -807,7 +1306,6 @@ fun DeckItemCard(
 
             Spacer(Modifier.height(16.dp))
 
-            // Botão de estudar
             Button(
                 onClick = onStudyClick,
                 shape = RoundedCornerShape(12.dp),
@@ -901,166 +1399,6 @@ fun CreateFolderDialog(
         dismissButton = {
             TextButton(
                 onClick = onCancel,
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text(
-                    "Cancelar",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        },
-        shape = RoundedCornerShape(20.dp)
-    )
-}
-
-@Composable
-fun MoveToPastaDialog(
-    folders: List<FolderWithDocumentsResponse>,
-    onConfirm: (Int?) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var selectedFolderId by remember { mutableStateOf<Int?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                "Mover para Pasta",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Selecione a pasta de destino:",
-                    fontSize = 14.sp,
-                    color = TextSecondary
-                )
-                Spacer(Modifier.height(16.dp))
-
-                // Opção para raiz (sem pasta)
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedFolderId = null },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (selectedFolderId == null)
-                        YellowAccent.copy(alpha = 0.15f)
-                    else
-                        Color.Transparent,
-                    border = BorderStroke(
-                        1.dp,
-                        if (selectedFolderId == null)
-                            YellowAccent
-                        else
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = selectedFolderId == null,
-                            onClick = { selectedFolderId = null },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = YellowAccent
-                            )
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Icon(
-                            Icons.Default.Home,
-                            null,
-                            tint = if (selectedFolderId == null) YellowAccent else TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Raiz (sem pasta)",
-                            fontWeight = if (selectedFolderId == null) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedFolderId == null)
-                                MaterialTheme.colorScheme.onSurface
-                            else
-                                TextSecondary
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                // Lista de pastas
-                folders.forEach { folder ->
-                    Spacer(Modifier.height(8.dp))
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedFolderId = folder.id },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selectedFolderId == folder.id)
-                            YellowAccent.copy(alpha = 0.15f)
-                        else
-                            Color.Transparent,
-                        border = BorderStroke(
-                            1.dp,
-                            if (selectedFolderId == folder.id)
-                                YellowAccent
-                            else
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedFolderId == folder.id,
-                                onClick = { selectedFolderId = folder.id },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = YellowAccent
-                                )
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Icon(
-                                Icons.Default.Folder,
-                                null,
-                                tint = if (selectedFolderId == folder.id) YellowAccent else TextSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                folder.name,
-                                fontWeight = if (selectedFolderId == folder.id) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedFolderId == folder.id)
-                                    MaterialTheme.colorScheme.onSurface
-                                else
-                                    TextSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(selectedFolderId) },
-                colors = ButtonDefaults.buttonColors(containerColor = YellowAccent),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text(
-                    "Mover",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(

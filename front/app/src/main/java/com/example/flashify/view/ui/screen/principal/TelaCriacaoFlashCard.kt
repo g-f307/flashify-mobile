@@ -43,7 +43,8 @@ import kotlin.math.roundToInt
 @Composable
 fun TelaCriacaoFlashCard(
     navController: NavController,
-    viewModel: DeckViewModel = viewModel()
+    viewModel: DeckViewModel = viewModel(),
+    folderId: Int? = null
 ) {
     var currentStep by remember { mutableStateOf(1) }
     var deckName by remember { mutableStateOf("") }
@@ -281,7 +282,8 @@ fun TelaCriacaoFlashCard(
                                         title = deckName,
                                         text = contentText,
                                         quantity = flashcardQuantity.roundToInt(),
-                                        generateQuiz = includeQuiz
+                                        generateQuiz = includeQuiz,
+                                        folderId = folderId
                                     )
                                 } else {
                                     selectedFileUri?.let { uri ->
@@ -289,7 +291,8 @@ fun TelaCriacaoFlashCard(
                                             title = deckName,
                                             fileUri = uri,
                                             quantity = flashcardQuantity.roundToInt(),
-                                            generateQuiz = includeQuiz
+                                            generateQuiz = includeQuiz,
+                                            folderId = folderId
                                         )
                                     }
                                 }
