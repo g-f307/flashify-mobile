@@ -1,7 +1,3 @@
-// ============================================================================
-// ARQUIVO 1: ApiService.kt (COMPLETO COM ADIÇÃO)
-// ============================================================================
-
 package com.example.flashify.model.network
 import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.DeckUpdateRequest
@@ -16,16 +12,25 @@ import com.example.flashify.model.data.UserCreateRequest
 import com.example.flashify.model.data.UserPasswordUpdateRequest
 import com.example.flashify.model.data.UserReadResponse
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
+import java.util.concurrent.TimeUnit
 
-private const val BASE_URL = "http://192.168.1.28:9000/"
+private const val BASE_URL = "http://10.100.33.138:9000/"
+
+private val okHttpClient = OkHttpClient.Builder()
+    .connectTimeout(120, TimeUnit.SECONDS) // 2 minutos para conectar
+    .readTimeout(120, TimeUnit.SECONDS)    // 2 minutos para esperar resposta (IA)
+    .writeTimeout(120, TimeUnit.SECONDS)   // 2 minutos para enviar (Upload)
+    .build()
 
 private val retrofit = Retrofit.Builder()
     .baseUrl(BASE_URL)
+    .client(okHttpClient) // ✅ Vincula o cliente configurado
     .addConverterFactory(GsonConverterFactory.create())
     .build()
 
@@ -102,11 +107,11 @@ interface ApiService {
         @Body studyLog: StudyLogRequest
     ): Response<Unit>
 
-    @PUT("flashcards/{id}")
+    @PUT("flashcards/{flashcard_id}")
     suspend fun updateFlashcard(
         @Header("Authorization") token: String,
-        @Path("id") flashcardId: Int,
-        @Body flashcardUpdate: FlashcardUpdateRequest
+        @Path("flashcard_id") flashcardId: Int,
+        @Body request: FlashcardUpdateRequest
     ): FlashcardResponse
 
     @GET("progress/stats")
@@ -181,6 +186,18 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Path("document_id") documentId: Int
     ): com.example.flashify.model.data.DeckStatsResponse
+
+    @POST("documents/{id}/generate-flashcards")
+    suspend fun generateFlashcardsForDocument(
+        @Header("Authorization") token: String,
+        @Path("id") documentId: Int
+    ): Response<Unit>
+
+    @POST("documents/{id}/generate-quiz")
+    suspend fun generateQuizForDocument(
+        @Header("Authorization") token: String,
+        @Path("id") documentId: Int
+    ): Response<Unit>
 }
 
 object Api {

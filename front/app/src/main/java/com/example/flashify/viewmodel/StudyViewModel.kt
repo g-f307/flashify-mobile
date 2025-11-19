@@ -21,6 +21,12 @@ sealed class StudyState {
     data class Error(val message: String) : StudyState()
 }
 
+sealed class FlashcardEditState {
+    object Idle : FlashcardEditState()
+    object Loading : FlashcardEditState()
+    object Success : FlashcardEditState()
+    data class Error(val message: String) : FlashcardEditState()
+}
 
 class StudyViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
@@ -30,6 +36,9 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _studyState = MutableStateFlow<StudyState>(StudyState.Loading)
     val studyState = _studyState.asStateFlow()
+
+    private val _editState = MutableStateFlow<FlashcardEditState>(FlashcardEditState.Idle)
+    val editState = _editState.asStateFlow()
 
     // --- CORREÇÃO 1: Store the current deckId ---
     private var currentDeckId: Int? = null
@@ -146,4 +155,53 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
         // documentId from response maps to deckId in the entity
         return FlashcardEntity(id, front, back, type, documentId, userId)
     }
+
+    fun updateFlashcard(flashcardId: Int, newFront: String?, newBack: String?) {
+        viewModelScope.launch {
+            _editState.value = FlashcardEditState.Loading
+            val userId = getCurrentUserId()
+
+            if (userId == TokenManager.INVALID_USER_ID) {
+                _editState.value = FlashcardEditState.Error("Utilizador inválido.")
+                return@launch
+            }
+
+            val token = tokenManager.getToken()
+            if (token == null) {
+                _editState.value = FlashcardEditState.Error("Sessão inválida.")
+                return@launch
+            }
+
+            try {
+                val request = com.example.flashify.model.data.FlashcardUpdateRequest(
+                    front = newFront,
+                    back = newBack
+                )
+
+                // Atualiza na API
+                val updatedFlashcard = apiService.updateFlashcard(token, flashcardId, request)
+
+                // Atualiza no cache local
+                val updatedEntity = updatedFlashcard.toFlashcardEntity(userId)
+                flashcardDao.updateFlashcard(updatedEntity)
+
+                // Recarrega a lista de flashcards
+                currentDeckId?.let { deckId ->
+                    val localFlashcards = flashcardDao.getFlashcardsForDeckForUser(deckId, userId)
+                        .map { it.toFlashcardResponse() }
+                    _studyState.value = StudyState.Success(localFlashcards)
+                }
+
+                _editState.value = FlashcardEditState.Success
+
+            } catch (e: Exception) {
+                _editState.value = FlashcardEditState.Error(e.message ?: "Erro ao atualizar flashcard")
+            }
+        }
+    }
+
+    fun resetEditState() {
+        _editState.value = FlashcardEditState.Idle
+    }
+
 }

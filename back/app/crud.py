@@ -162,6 +162,27 @@ def get_flashcard(session: Session, flashcard_id: int, user_id: int) -> models.F
     )
     return session.exec(statement).first()
 
+def update_flashcard(db: Session, flashcard_id: int, front: str | None = None, back: str | None = None) -> models.Flashcard | None:
+    """
+    Atualiza o conteúdo de um flashcard (frente e/ou verso).
+    """
+    db_flashcard = db.get(models.Flashcard, flashcard_id)
+    
+    if not db_flashcard:
+        return None
+
+    # Atualiza apenas se os valores foram passados
+    if front is not None:
+        db_flashcard.front = front
+    if back is not None:
+        db_flashcard.back = back
+
+    db.add(db_flashcard)
+    db.commit()
+    db.refresh(db_flashcard)
+    
+    return db_flashcard
+
 def create_study_log(session: Session, user_id: int, flashcard_id: int, accuracy: float) -> models.StudyLog:
     db_study_log = models.StudyLog(
         user_id=user_id,

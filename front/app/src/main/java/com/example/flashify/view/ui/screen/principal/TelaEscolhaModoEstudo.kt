@@ -1,5 +1,7 @@
 package com.example.flashify.view.ui.screen.principal
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,7 +34,9 @@ import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.DeckListState
 import com.example.flashify.viewmodel.DeckStatsState
+import com.example.flashify.viewmodel.DeckActionState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,13 +46,23 @@ fun TelaEscolhaModoEstudo(
     deckViewModel: DeckViewModel = viewModel()
 ) {
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
-    var deck by remember { mutableStateOf<com.example.flashify.model.data.DeckResponse?>(null) }
-
-    // ✅ Coleta o novo estado de estatísticas
     val statsState by deckViewModel.deckStatsState.collectAsStateWithLifecycle()
+    val actionState by deckViewModel.deckActionState.collectAsStateWithLifecycle()
 
-    // Controla o refresh quando volta do quiz
+    var deck by remember { mutableStateOf<com.example.flashify.model.data.DeckResponse?>(null) }
     var shouldRefresh by remember { mutableStateOf(false) }
+
+    // Estados separados para controlar o loading de cada card
+    var isCreatingFlashcards by remember { mutableStateOf(false) }
+    var isCreatingQuiz by remember { mutableStateOf(false) }
+
+    // Guarda o estado anterior para detectar mudanças
+    var previousHasQuiz by remember { mutableStateOf(deck?.hasQuiz ?: false) }
+    var previousFlashcardsTotal by remember { mutableStateOf(0) }
+
+    // SnackbarHost para mostrar mensagens
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     // Observa se voltou de um quiz completado
     val navBackStackEntry = navController.currentBackStackEntry
@@ -63,38 +77,193 @@ fun TelaEscolhaModoEstudo(
         }
     }
 
-    // ✅ Carrega os dados do deck E as estatísticas na primeira vez
+    // Carrega os dados do deck E as estatísticas na primeira vez
     LaunchedEffect(deckId) {
-        // Limpa stats anteriores (se houver) e busca as novas
+        println("🚀 INICIALIZANDO TelaEscolhaModoEstudo para deck $deckId")
+
         deckViewModel.resetStatsState()
         deckViewModel.fetchDeckStats(deckId)
 
-        // Se a lista de decks ainda não foi carregada, busca
         if (deckViewModel.deckListState.value !is DeckListState.Success) {
             deckViewModel.fetchDecks()
         }
+
+        // Inicializa os valores anteriores após carregar os dados
+        delay(1000)
+        deck?.let {
+            previousHasQuiz = it.hasQuiz
+            println("   Inicializado previousHasQuiz = ${it.hasQuiz}")
+        }
+
+        val currentStatsState = deckViewModel.deckStatsState.value
+        if (currentStatsState is DeckStatsState.Success) {
+            previousFlashcardsTotal = currentStatsState.stats.flashcards.total
+            println("   Inicializado previousFlashcardsTotal = $previousFlashcardsTotal")
+        }
     }
 
-    // ✅ Recarrega TUDO quando shouldRefresh é true
+    // Recarrega TUDO quando shouldRefresh é true
     LaunchedEffect(shouldRefresh) {
         if (shouldRefresh) {
-            delay(500) // Pequeno delay para garantir que o backend processou
+            delay(500)
             deckViewModel.fetchDecks()
-            deckViewModel.fetchDeckStats(deckId) // <-- Ponto crucial
+            deckViewModel.fetchDeckStats(deckId)
             shouldRefresh = false
         }
     }
 
-    // Atualiza o deck (da lista) quando o estado muda
+    // Atualiza o deck quando o estado muda
     LaunchedEffect(deckState) {
         if (deckState is DeckListState.Success) {
-            deck = (deckState as DeckListState.Success).decks.find { it.id == deckId }
+            val updatedDeck = (deckState as DeckListState.Success).decks.find { it.id == deckId }
+            if (updatedDeck != null) {
+                val deckChanged = updatedDeck != deck
+
+                // 🔴 ALTERADO: Lógica de parada simplificada e absoluta
+                if (isCreatingQuiz && updatedDeck.hasQuiz) {
+                    println("🎉 QUIZ DETECTADO! Parando loading do quiz...")
+                    isCreatingQuiz = false
+                }
+
+                previousHasQuiz = updatedDeck.hasQuiz
+                deck = updatedDeck
+            } else {
+                println("⚠️ Deck não encontrado na lista!")
+            }
+        }
+    }
+
+    // Força atualização quando stats mudam
+    LaunchedEffect(statsState) {
+        when (val currentStatsState = statsState) {
+            is DeckStatsState.Success -> {
+                val flashcardsTotal = currentStatsState.stats.flashcards.total
+                val hasQuizInStats = currentStatsState.stats.quiz != null
+
+                // 🔴 ALTERADO: Lógica de parada simplificada e absoluta
+                if (isCreatingFlashcards && flashcardsTotal > 0) {
+                    println("🎉 FLASHCARDS DETECTADOS! Parando loading dos flashcards...")
+                    isCreatingFlashcards = false
+                }
+
+                previousFlashcardsTotal = flashcardsTotal
+            }
+            is DeckStatsState.Loading -> {
+                println("📊 Stats: Loading...")
+            }
+            is DeckStatsState.Error -> {
+                println("❌ Stats Error: ${currentStatsState.message}")
+            }
+            else -> {}
+        }
+    }
+
+    // Observa o estado de ação e recarrega quando uma ação é bem-sucedida
+    LaunchedEffect(actionState) {
+        when (val currentActionState = actionState) {
+            is DeckActionState.Success -> {
+                println("=" .repeat(60))
+                println("✅ AÇÃO BEM-SUCEDIDA!")
+                println("   Mensagem: ${currentActionState.message}")
+
+                val message = currentActionState.message
+
+                // Inicia o polling: recarrega dados repetidamente até detectar mudança
+                var attempts = 0
+                val maxAttempts = 45 // 45 segundos (cada delay é aprox 1s no total com rede)
+
+                while (attempts < maxAttempts) {
+                    attempts++
+
+                    // Se já detectou mudança (pelas variáveis observadas nos outros LaunchedEffect), sai
+                    if (!isCreatingFlashcards && !isCreatingQuiz) {
+                        println("\n✅ SUCESSO! Conteúdo detectado pelos observadores!")
+                        break
+                    }
+
+                    println("\n🔄 POLLING SILENCIOSO - Tentativa $attempts/$maxAttempts")
+
+                    // 🔴 ALTERADO: Usa showLoading = false para não piscar a tela
+                    deckViewModel.fetchDecks(showLoading = false)
+                    deckViewModel.fetchDeckStats(deckId, showLoading = false)
+
+                    delay(2000)
+                }
+
+                // Timeout: força parar os loadings
+                if (isCreatingFlashcards || isCreatingQuiz) {
+                    println("\n⏱️ TIMEOUT ATINGIDO após $attempts tentativas")
+                    isCreatingFlashcards = false
+                    isCreatingQuiz = false
+
+                    // Faz um último refresh VISÍVEL
+                    deckViewModel.fetchDecks(showLoading = true)
+                    deckViewModel.fetchDeckStats(deckId, showLoading = true)
+                }
+
+                println("\n🎉 Finalizando ação...")
+
+                // Mostra mensagem de sucesso
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+
+                deckViewModel.resetActionState()
+            }
+            is DeckActionState.Error -> {
+                println("❌ ERRO NA AÇÃO: ${currentActionState.message}")
+
+                // Para o loading em caso de erro
+                isCreatingFlashcards = false
+                isCreatingQuiz = false
+
+                // Mostra mensagem de erro
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = currentActionState.message,
+                        duration = SnackbarDuration.Long
+                    )
+                }
+
+                deckViewModel.resetActionState()
+            }
+            is DeckActionState.Loading -> {
+                println("⏳ Ação em andamento...")
+            }
+            else -> {}
+        }
+    }
+
+    // Observa mudanças no deckState e statsState para atualizar o deck local
+    LaunchedEffect(deckState, statsState) {
+        if (deckState is DeckListState.Success) {
+            val updatedDeck = (deckState as DeckListState.Success).decks.find { it.id == deckId }
+            if (updatedDeck != null) {
+                deck = updatedDeck
+            }
         }
     }
 
     GradientBackgroundScreen {
         Scaffold(
             containerColor = Color.Transparent,
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    snackbar = { snackbarData ->
+                        Snackbar(
+                            snackbarData = snackbarData,
+                            containerColor = YellowAccent,
+                            contentColor = Color.Black,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                )
+            },
             topBar = {
                 TopAppBar(
                     title = {},
@@ -126,7 +295,6 @@ fun TelaEscolhaModoEstudo(
                     .padding(innerPadding)
             ) {
                 when {
-                    // ✅ Espera tanto pela lista QUANTO pelas estatísticas
                     (deckState is DeckListState.Loading || statsState is DeckStatsState.Loading) && deck == null -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -142,14 +310,12 @@ fun TelaEscolhaModoEstudo(
                         )
                     }
                     deck == null -> {
-                        // Se as stats falharem, statsState será Error
                         if (statsState is DeckStatsState.Error) {
                             ErrorContent(
                                 onRetry = { deckViewModel.fetchDeckStats(deckId) },
                                 onBack = { navController.popBackStack() }
                             )
                         } else {
-                            // Deck realmente não encontrado na lista
                             DeckNotFoundContent(
                                 onBack = { navController.popBackStack() }
                             )
@@ -157,12 +323,22 @@ fun TelaEscolhaModoEstudo(
                     }
                     else -> {
                         val currentDeck = deck!!
-                        // ✅ Passa o novo objeto de stats para o MainContent
                         MainContent(
                             deck = currentDeck,
                             stats = (statsState as? DeckStatsState.Success)?.stats,
                             navController = navController,
-                            deckId = deckId
+                            deckId = deckId,
+                            deckViewModel = deckViewModel,
+                            isCreatingFlashcards = isCreatingFlashcards,
+                            isCreatingQuiz = isCreatingQuiz,
+                            onCreateFlashcards = {
+                                isCreatingFlashcards = true
+                                deckViewModel.generateFlashcardsForDocument(deckId)
+                            },
+                            onCreateQuiz = {
+                                isCreatingQuiz = true
+                                deckViewModel.generateQuizForDocument(deckId)
+                            }
                         )
                     }
                 }
@@ -174,20 +350,22 @@ fun TelaEscolhaModoEstudo(
 @Composable
 fun MainContent(
     deck: com.example.flashify.model.data.DeckResponse,
-    // ✅ Recebe o novo objeto de stats (pode ser nulo)
     stats: com.example.flashify.model.data.DeckStatsResponse?,
     navController: NavController,
-    deckId: Int
+    deckId: Int,
+    deckViewModel: DeckViewModel,
+    isCreatingFlashcards: Boolean,
+    isCreatingQuiz: Boolean,
+    onCreateFlashcards: () -> Unit,
+    onCreateQuiz: () -> Unit
 ) {
-    // ✅ Calcula estatísticas dinâmicas a partir do objeto 'stats'
     val quizAttempts = stats?.quiz?.totalAttempts ?: 0
     val quizAverageScore = stats?.quiz?.averageScore ?: 0f
     val quizLastScore = stats?.quiz?.lastScore ?: 0f
     val hasQuizStats = quizAttempts > 0
 
-    // ✅ Usa as estatísticas de flashcard do objeto 'stats'
-    // O backend [stats.py] envia a percentagem como 0-100
     val flashcardProgress = stats?.flashcards?.progressPercentage ?: 0f
+    val hasFlashcards = (stats?.flashcards?.total ?: 0) > 0
 
     Column(
         modifier = Modifier
@@ -255,8 +433,11 @@ fun MainContent(
             onClick = {
                 navController.navigate("$ESTUDO_SCREEN_ROUTE/$deckId")
             },
-            // ✅ Habilita se tiver stats de flashcard (ou se o deck.total for > 0)
-            enabled = (stats?.flashcards?.total ?: deck.totalFlashcards) > 0
+            enabled = hasFlashcards,
+            isLocked = !hasFlashcards,
+            onCreateContent = onCreateFlashcards,
+            isCreating = isCreatingFlashcards,
+            contentType = "Flashcards"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -271,12 +452,16 @@ fun MainContent(
             onClick = {
                 navController.navigate("$QUIZ_SCREEN_ROUTE/$deckId")
             },
-            enabled = deck.hasQuiz
+            enabled = deck.hasQuiz,
+            isLocked = !deck.hasQuiz,
+            onCreateContent = onCreateQuiz,
+            isCreating = isCreatingQuiz,
+            contentType = "Quiz"
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Estatísticas do Deck com visual melhorado
+        // Estatísticas do Deck
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -332,7 +517,6 @@ fun MainContent(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            // ✅ Usa 'flashcardProgress' (0-100)
                             "${flashcardProgress.toInt()}%",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
@@ -342,7 +526,6 @@ fun MainContent(
                         Box(
                             modifier = Modifier
                                 .width(80.dp)
-                                // ✅ Usa 'flashcardProgress'
                                 .height((flashcardProgress.toInt() * 1.2).dp.coerceAtMost(120.dp))
                                 .background(
                                     brush = Brush.verticalGradient(
@@ -365,14 +548,13 @@ fun MainContent(
 
                     Spacer(modifier = Modifier.width(24.dp))
 
-                    // Barra de Quiz (se disponível e com estatísticas)
+                    // Barra de Quiz
                     if (deck.hasQuiz) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.weight(1f)
                         ) {
                             val displayScore = if (hasQuizStats) {
-                                // ✅ Usa 'quizAverageScore' (0-100)
                                 "${quizAverageScore.toInt()}%"
                             } else {
                                 "0%"
@@ -387,10 +569,9 @@ fun MainContent(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             val barHeight = if (hasQuizStats) {
-                                // ✅ Usa 'quizAverageScore'
                                 (quizAverageScore.toInt() * 1.2).dp.coerceAtMost(120.dp)
                             } else {
-                                8.dp // Altura mínima quando não há dados
+                                8.dp
                             }
 
                             Box(
@@ -441,7 +622,6 @@ fun MainContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // ✅ Usa dados do 'stats'
                     StatItemCompact(
                         label = "Conhecidos",
                         value = stats?.flashcards?.known?.toString() ?: "0"
@@ -466,7 +646,6 @@ fun MainContent(
                             color = TextSecondary
                         )
                         Text(
-                            // ✅ Usa 'flashcardProgress'
                             "${flashcardProgress.toInt()}% de acerto",
                             fontSize = 13.sp,
                             color = YellowAccent,
@@ -475,7 +654,6 @@ fun MainContent(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
-                        // ✅ Usa 'flashcardProgress' (dividido por 100 para 0-1)
                         progress = { flashcardProgress / 100f },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -486,7 +664,7 @@ fun MainContent(
                     )
                 }
 
-                // Estatísticas de Quiz - AGORA DINÂMICAS
+                // Estatísticas de Quiz
                 if (deck.hasQuiz) {
                     Spacer(modifier = Modifier.height(24.dp))
                     Divider(color = Color.Gray.copy(alpha = 0.2f))
@@ -502,7 +680,6 @@ fun MainContent(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (hasQuizStats) {
-                        // Se tem estatísticas, mostra os dados reais
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -514,7 +691,6 @@ fun MainContent(
                                     color = TextSecondary
                                 )
                                 Text(
-                                    // ✅ Usa 'quizLastScore'
                                     "${quizLastScore.toInt()}%",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
@@ -528,7 +704,6 @@ fun MainContent(
                                     color = TextSecondary
                                 )
                                 Text(
-                                    // ✅ Usa 'quizAverageScore'
                                     "${quizAverageScore.toInt()}%",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
@@ -557,14 +732,12 @@ fun MainContent(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                // ✅ Usa 'quizAttempts'
                                 "$quizAttempts tentativa${if (quizAttempts > 1) "s" else ""}",
                                 fontSize = 12.sp,
                                 color = TextSecondary
                             )
                         }
                     } else {
-                        // Se não tem estatísticas ainda, mostra mensagem informativa
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -606,8 +779,17 @@ fun ModoEstudoCardMelhorado(
     gradient: List<Color>,
     iconBackground: Color,
     onClick: () -> Unit,
-    enabled: Boolean
+    enabled: Boolean,
+    isLocked: Boolean = false,
+    onCreateContent: () -> Unit = {},
+    isCreating: Boolean = false,
+    contentType: String = ""
 ) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (isCreating) 1f else 0f,
+        label = "progress"
+    )
+
     Card(
         onClick = if (enabled) onClick else {{}},
         modifier = Modifier
@@ -670,7 +852,7 @@ fun ModoEstudoCardMelhorado(
                         tint = gradient[0],
                         modifier = Modifier.size(24.dp)
                     )
-                } else {
+                } else if (isLocked) {
                     Icon(
                         Icons.Default.Lock,
                         contentDescription = "Bloqueado",
@@ -691,30 +873,91 @@ fun ModoEstudoCardMelhorado(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Mostra progresso se estiver criando
+            AnimatedVisibility(visible = isCreating) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = gradient[0],
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Gerando $contentType...",
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = gradient[0],
+                        trackColor = Color.Gray.copy(alpha = 0.2f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
             // Botão de ação
-            Button(
-                onClick = if (enabled) onClick else {{}},
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                enabled = enabled,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (enabled) gradient[0] else Color.Gray,
-                    contentColor = Color.Black
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (enabled) "Iniciar" else "Indisponível",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                )
+            if (isLocked && !isCreating) {
+                // Mostra botão de criar quando está bloqueado
+                Button(
+                    onClick = onCreateContent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = gradient[0],
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Criar $contentType",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+            } else if (!isCreating) {
+                // Botão normal de iniciar
+                Button(
+                    onClick = if (enabled) onClick else {{}},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    enabled = enabled,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (enabled) gradient[0] else Color.Gray,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (enabled) "Iniciar" else "Indisponível",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
             }
         }
     }

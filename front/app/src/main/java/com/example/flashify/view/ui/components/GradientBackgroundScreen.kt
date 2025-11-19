@@ -14,15 +14,15 @@ import androidx.compose.ui.graphics.Color
 fun GradientBackgroundScreen(content: @Composable () -> Unit) {
     val isDarkTheme = isSystemInDarkTheme()
 
-    // Define o brush do gradiente
+    // Define o brush do gradiente para TEMA CLARO (inspirado na web)
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFFFFF7DC), // Amarelo pálido
-            Color(0xFFEFEFEF),
-            Color(0xFFEFEFEF)
+            Color(0xFFFFF7DC), // Amarelo pálido (topo)
+            Color(0xFFFFFBF0), // Amarelo ainda mais claro (meio)
+            Color(0xFFFFFFFF)  // Branco (fundo)
         ),
         startY = 0f,
-        endY = 1200f
+        endY = 1500f // Transição mais suave
     )
 
     Box(

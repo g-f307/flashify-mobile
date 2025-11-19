@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -27,12 +28,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.NavItem
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.*
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
 import com.example.flashify.view.ui.theme.TextSecondary
 import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun TelaPrincipal(
@@ -147,9 +150,15 @@ fun TelaPrincipal(
 }
 
 @Composable
-fun CabecalhoUsuario(homeViewModel: HomeViewModel, settingsViewModel: SettingsViewModel = viewModel()) {
+fun CabecalhoUsuario(
+    homeViewModel: HomeViewModel,
+    settingsViewModel: SettingsViewModel = viewModel()
+) {
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = true)
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
-    var isDarkTheme by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -219,12 +228,12 @@ fun CabecalhoUsuario(homeViewModel: HomeViewModel, settingsViewModel: SettingsVi
             }
         }
 
-        // Botão de tema (funcional)
+        // Botão de tema (agora funcional!)
         IconButton(
             onClick = {
-                isDarkTheme = !isDarkTheme
-                // TODO: Implementar mudança de tema real
-                // Por enquanto, apenas visual
+                scope.launch {
+                    themeManager.toggleTheme()
+                }
             }
         ) {
             Icon(

@@ -21,4 +21,7 @@ interface FlashcardDao {
     // (Opcional) Função para apagar todos os flashcards de um utilizador
     @Query("DELETE FROM flashcards WHERE userId = :userId")
     suspend fun deleteAllFlashcardsForUser(userId: Int)
+
+    @Update
+    suspend fun updateFlashcard(flashcard: FlashcardEntity)
 }

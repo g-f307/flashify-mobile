@@ -24,9 +24,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.FlashcardResponse
+import com.example.flashify.view.ui.components.EditFlashcardDialog
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.theme.TextSecondary
 import com.example.flashify.view.ui.theme.YellowAccent
+import com.example.flashify.viewmodel.FlashcardEditState
 import com.example.flashify.viewmodel.StudyState
 import com.example.flashify.viewmodel.StudyViewModel
 import kotlinx.coroutines.delay
@@ -123,6 +125,7 @@ fun TelaEstudo(
                         }
                     }
                     is StudyState.Success -> {
+                        // ✅ PASSA O VIEWMODEL PARA StudySession
                         StudySession(
                             flashcards = state.flashcards,
                             onLogStudy = { flashcardId, accuracy ->
@@ -131,7 +134,8 @@ fun TelaEstudo(
                             onFinish = {
                                 isTimerRunning = false
                                 navController.popBackStack()
-                            }
+                            },
+                            viewModel = viewModel // ✅ NOVO PARÂMETRO
                         )
                     }
                 }
@@ -140,17 +144,31 @@ fun TelaEstudo(
     }
 }
 
+
 @Composable
 fun StudySession(
     flashcards: List<FlashcardResponse>,
     onLogStudy: (Int, Float) -> Unit,
-    onFinish: () -> Unit
+    onFinish: () -> Unit,
+    viewModel: StudyViewModel // ✅ NOVO PARÂMETRO
 ) {
     var currentCardIndex by remember { mutableStateOf(0) }
     var isFlipped by remember { mutableStateOf(false) }
     var cardsCorrect by remember { mutableStateOf(0) }
     var cardsIncorrect by remember { mutableStateOf(0) }
     var showCompletionDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) } // ✅ NOVO ESTADO
+
+    // ✅ OBSERVAR O ESTADO DE EDIÇÃO
+    val editState by viewModel.editState.collectAsStateWithLifecycle()
+
+    // ✅ EFEITO PARA FECHAR DIALOG APÓS SUCESSO
+    LaunchedEffect(editState) {
+        if (editState is FlashcardEditState.Success) {
+            showEditDialog = false
+            viewModel.resetEditState()
+        }
+    }
 
     if (flashcards.isEmpty()) {
         Card(
@@ -202,6 +220,35 @@ fun StudySession(
             currentCardIndex++
         } else {
             showCompletionDialog = true
+        }
+    }
+
+    // ✅ DIALOG DE EDIÇÃO
+    if (showEditDialog) {
+        EditFlashcardDialog(
+            currentFront = currentFlashcard.question,
+            currentBack = currentFlashcard.answer,
+            isLoading = editState is FlashcardEditState.Loading,
+            onDismiss = {
+                showEditDialog = false
+                viewModel.resetEditState()
+            },
+            onConfirm = { newFront, newBack ->
+                viewModel.updateFlashcard(
+                    flashcardId = currentFlashcard.id,
+                    newFront = newFront,
+                    newBack = newBack
+                )
+            }
+        )
+    }
+
+    // ✅ SNACKBAR DE ERRO
+    if (editState is FlashcardEditState.Error) {
+        val error = (editState as FlashcardEditState.Error).message
+        LaunchedEffect(error) {
+            // Aqui você pode adicionar um Snackbar se quiser
+            println("Erro ao editar: $error")
         }
     }
 
@@ -270,12 +317,13 @@ fun StudySession(
 
         Spacer(Modifier.weight(1f))
 
-        // Flashcard
+        // Flashcard com botão de edição
         FlashcardView(
             flashcard = currentFlashcard,
             isFlipped = isFlipped,
             rotation = rotation,
-            onFlip = { isFlipped = !isFlipped }
+            onFlip = { isFlipped = !isFlipped },
+            onEdit = { showEditDialog = true } // ✅ ABRE O DIALOG
         )
 
         Spacer(Modifier.weight(1f))
@@ -338,12 +386,14 @@ fun StudySession(
     }
 }
 
+
 @Composable
 fun FlashcardView(
     flashcard: FlashcardResponse,
     isFlipped: Boolean,
     rotation: Float,
-    onFlip: () -> Unit = {}
+    onFlip: () -> Unit = {},
+    onEdit: () -> Unit = {} // ✅ NOVO PARÂMETRO
 ) {
     Card(
         modifier = Modifier
@@ -363,56 +413,77 @@ fun FlashcardView(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
-            contentAlignment = Alignment.Center
+                .padding(32.dp)
         ) {
-            if (rotation <= 90f) {
-                // Front (Question)
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        "Pergunta",
-                        fontSize = 14.sp,
-                        color = YellowAccent,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        flashcard.question,
-                        fontSize = 20.sp,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 28.sp
-                    )
-                }
-            } else {
-                // Back (Answer) - flipped horizontally
-                Column(
-                    modifier = Modifier.graphicsLayer { rotationY = 180f },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        "Resposta",
-                        fontSize = 14.sp,
-                        color = Color(0xFF00BCD4),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        flashcard.answer,
-                        fontSize = 20.sp,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 28.sp
-                    )
+            // ✅ BOTÃO DE EDIÇÃO (sempre visível no canto superior direito)
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Editar flashcard",
+                    tint = YellowAccent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Conteúdo do flashcard
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                if (rotation <= 90f) {
+                    // Front (Question)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "Pergunta",
+                            fontSize = 14.sp,
+                            color = YellowAccent,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            flashcard.question,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 28.sp
+                        )
+                    }
+                } else {
+                    // Back (Answer) - flipped horizontally
+                    Column(
+                        modifier = Modifier.graphicsLayer { rotationY = 180f },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "Resposta",
+                            fontSize = 14.sp,
+                            color = Color(0xFF00BCD4),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            flashcard.answer,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 28.sp
+                        )
+                    }
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun StatBadge(

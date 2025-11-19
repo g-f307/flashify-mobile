@@ -18,10 +18,8 @@ import com.example.flashify.model.network.Api
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody // <-- CORREÇÃO: Importar RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
 import java.io.InputStream
@@ -74,7 +72,6 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
 
     private val tokenManager = TokenManager(application)
     private val apiService = Api.retrofitService
-    private val flashcardDao = AppDatabase.getDatabase(application).flashcardDao()
     private val deckDao = AppDatabase.getDatabase(application).deckDao()
 
     // StateFlow para a lista de decks
@@ -108,9 +105,13 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
     //Função auxiliar para obter o ID do usuário
     private fun getCurrentUserId(): Int = tokenManager.getUserId()
 
-    fun fetchDecks() {
+    // 🔴 ALTERADO: Adicionado parâmetro showLoading para evitar flicker na UI durante polling
+    fun fetchDecks(showLoading: Boolean = true) {
         viewModelScope.launch {
-            _deckListState.value = DeckListState.Loading
+            if (showLoading) {
+                _deckListState.value = DeckListState.Loading
+            }
+
             val userId = getCurrentUserId()
             if (userId == TokenManager.INVALID_USER_ID) {
                 _deckListState.value = DeckListState.Error("Utilizador inválido.")
@@ -155,10 +156,13 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ✅ NOVA FUNÇÃO PARA BUSCAR ESTATÍSTICAS DE UM DECK ESPECÍFICO
-    fun fetchDeckStats(documentId: Int) {
+    // 🔴 ALTERADO: Adicionado parâmetro showLoading
+    fun fetchDeckStats(documentId: Int, showLoading: Boolean = true) {
         viewModelScope.launch {
-            _deckStatsState.value = DeckStatsState.Loading
+            if (showLoading) {
+                _deckStatsState.value = DeckStatsState.Loading
+            }
+
             try {
                 val token = tokenManager.getToken()
                 if (token == null) {
@@ -190,7 +194,7 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
         quantity: Int,
         generateQuiz: Boolean = false,
         numQuestions: Int = 5,
-        folderId: Int? = null  // ✅ NOVO PARÂMETRO
+        folderId: Int? = null
     ) {
         viewModelScope.launch {
             _deckCreationState.value = DeckCreationState.Loading
@@ -210,7 +214,7 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
                     generate_quizzes = generateQuiz,
                     content_type = if (generateQuiz) "both" else "flashcards",
                     num_questions = numQuestions,
-                    folder_id = folderId  // ✅ ADICIONAR AO REQUEST
+                    folder_id = folderId
                 )
                 val response = apiService.createDeckFromText(token, request)
                 _deckCreationState.value = DeckCreationState.Success(response)
@@ -227,7 +231,7 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
         quantity: Int,
         generateQuiz: Boolean = false,
         numQuestions: Int = 5,
-        folderId: Int? = null  // ✅ NOVO PARÂMETRO
+        folderId: Int? = null
     ) {
         viewModelScope.launch {
             _deckCreationState.value = DeckCreationState.Loading
@@ -250,7 +254,6 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
                 val contentTypePart = (if (generateQuiz) "both" else "flashcards").toRequestBody(plainTextType)
                 val numQuestionsPart = numQuestions.toString().toRequestBody(plainTextType)
 
-                // ✅ ADICIONAR FOLDER_ID COMO PART
                 val folderIdPart = folderId?.toString()?.toRequestBody(plainTextType)
 
                 val inputStream: InputStream? = context.contentResolver.openInputStream(fileUri)
@@ -277,7 +280,7 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
                     generatesQuizzes = generateQuizzesPart,
                     contentType = contentTypePart,
                     numQuestions = numQuestionsPart,
-                    folderId = folderIdPart  // ✅ PASSAR FOLDER_ID
+                    folderId = folderIdPart
                 )
 
                 _deckCreationState.value = DeckCreationState.Success(response)
@@ -388,6 +391,58 @@ class DeckViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetCreationState() {
         _deckCreationState.value = DeckCreationState.Idle
+    }
+
+    fun generateFlashcardsForDocument(documentId: Int) {
+        viewModelScope.launch {
+            _deckActionState.value = DeckActionState.Loading
+            try {
+                val token = tokenManager.getToken()
+                if (token == null) {
+                    _deckActionState.value = DeckActionState.Error("Sessão expirada")
+                    return@launch
+                }
+
+                apiService.generateFlashcardsForDocument(token, documentId)
+
+                _deckActionState.value = DeckActionState.Success("Flashcards gerados com sucesso!")
+
+                // Recarrega os dados
+                fetchDecks()
+                fetchDeckStats(documentId)
+
+            } catch (e: Exception) {
+                _deckActionState.value = DeckActionState.Error(
+                    e.message ?: "Erro ao gerar flashcards"
+                )
+            }
+        }
+    }
+
+    fun generateQuizForDocument(documentId: Int) {
+        viewModelScope.launch {
+            _deckActionState.value = DeckActionState.Loading
+            try {
+                val token = tokenManager.getToken()
+                if (token == null) {
+                    _deckActionState.value = DeckActionState.Error("Sessão expirada")
+                    return@launch
+                }
+
+                apiService.generateQuizForDocument(token, documentId)
+
+                _deckActionState.value = DeckActionState.Success("Quiz gerado com sucesso!")
+
+                // Recarrega os dados
+                fetchDecks()
+                fetchDeckStats(documentId)
+
+            } catch (e: Exception) {
+                _deckActionState.value = DeckActionState.Error(
+                    e.message ?: "Erro ao gerar quiz"
+                )
+            }
+        }
     }
 
     private fun getFileName(context: android.content.Context, uri: Uri): String {

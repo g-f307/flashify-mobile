@@ -12,54 +12,100 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// Importe suas novas cores
-import com.example.flashify.view.ui.theme.LightYellowBackground
-import com.example.flashify.view.ui.theme.CardBackgroundLight
-import com.example.flashify.view.ui.theme.TextColorLight
-import com.example.flashify.view.ui.theme.YellowAccent // Certifique-se que YellowAccent está aqui
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.DarkBackground
-import com.example.flashify.view.ui.theme.CardBackground
-import com.example.flashify.view.ui.theme.TextPrimary
-// Se você criou YellowGradientStart, importe-o também
-
+// Esquema de cores para o TEMA CLARO (inspirado na web)
 private val MyLightColorScheme = lightColorScheme(
+    // Cor primária - Amarelo vibrante
     primary = YellowAccent,
     onPrimary = Color.Black,
-    background = Color.White, // **MUDANÇA AQUI:** Fundo será branco ou quase
-    surface = CardBackgroundLight,
-    onBackground = TextColorLight,
+
+    // Cor secundária
+    secondary = LightTextSecondary,
+    onSecondary = LightTextPrimary,
+
+    // Fundo geral do app - O gradiente é aplicado pelo GradientBackgroundScreen
+    background = Color.White, // Branco como base (o gradiente sobrescreve)
+    onBackground = LightTextPrimary,
+
+    // Fundo dos cards e superfícies
+    surface = CardBackgroundLight, // Branco puro
     onSurface = TextColorLight,
-    secondary = TextSecondary,
-    onSecondary = TextColorLight
+
+    // Variantes
+    surfaceVariant = Color(0xFFF5F5F5), // Cinza muito claro
+    onSurfaceVariant = LightTextSecondary,
+
+    // Container primário (usado em alguns cards)
+    primaryContainer = LightSurface,
+    onPrimaryContainer = LightTextPrimary,
+
+    // Outline (bordas)
+    outline = Color(0xFFE0E0E0),
+    outlineVariant = Color(0xFFF0F0F0),
+
+    // Cores de erro
+    error = Color(0xFFD32F2F),
+    onError = Color.White,
+    errorContainer = Color(0xFFFFCDD2),
+    onErrorContainer = Color(0xFFB71C1C)
 )
 
+// Esquema de cores para o TEMA ESCURO
 private val DarkColorScheme = darkColorScheme(
+    // Cor primária - Amarelo vibrante
     primary = YellowAccent,
-    background = DarkBackground,
-    surface = CardBackground,
     onPrimary = DarkBackground,
+
+    // Cor secundária
+    secondary = TextSecondary,
+    onSecondary = TextPrimary,
+
+    // Fundo geral do app
+    background = DarkBackground,
     onBackground = TextPrimary,
+
+    // Fundo dos cards e superfícies
+    surface = CardBackground,
     onSurface = TextPrimary,
+
+    // Variantes
+    surfaceVariant = Color(0xFF3C3C3E),
+    onSurfaceVariant = TextSecondary,
+
+    // Container primário
     primaryContainer = CardBackground,
-    onSurfaceVariant = TextSecondary
+    onPrimaryContainer = TextPrimary,
+
+    // Outline (bordas)
+    outline = Color(0xFF4A4A4A),
+    outlineVariant = Color(0xFF3A3A3A),
+
+    // Cores de erro
+    error = Color(0xFFEF5350),
+    onError = Color.Black,
+    errorContainer = Color(0xFF8B0000),
+    onErrorContainer = Color(0xFFFFCDD2)
 )
 
 @Composable
 fun FlashifyTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    // Escolhe o esquema de cores baseado no tema
     val colorScheme = when {
         darkTheme -> DarkColorScheme
-        else -> MyLightColorScheme // Usando o tema claro com fundo branco
+        else -> MyLightColorScheme
     }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            // Define a cor da barra de status
             window.statusBarColor = colorScheme.background.toArgb()
+            // Define se os ícones da barra devem ser escuros (tema claro) ou claros (tema escuro)
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }

@@ -96,4 +96,6 @@ dependencies {
 
     // Google ID para Credential Manager
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 }
