@@ -1,11 +1,10 @@
-// ==================== LoginViewModel.kt ====================
 package com.example.flashify.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashify.model.manager.TokenManager
-import com.example.flashify.model.network.Api
+import com.example.flashify.model.network.ApiService
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -13,6 +12,7 @@ import retrofit2.HttpException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import javax.inject.Inject
 
 sealed class LoginUIState {
     object Idle : LoginUIState()
@@ -29,9 +29,11 @@ enum class ErrorType {
     UNKNOWN
 }
 
-class LoginViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val tokenManager = TokenManager(application)
+@HiltViewModel
+class LoginViewModel @Inject constructor(
+    private val tokenManager: TokenManager,
+    private val apiService: ApiService
+) : ViewModel() {
 
     private val _loginState = MutableStateFlow<LoginUIState>(LoginUIState.Idle)
     val loginState: StateFlow<LoginUIState> = _loginState
@@ -40,18 +42,15 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _loginState.value = LoginUIState.Loading
             try {
-                // 1. Faz o login para obter o token
-                val tokenResponse = Api.retrofitService.login(
+                val tokenResponse = apiService.login(
                     username = username,
                     password = password
                 )
                 val token = "Bearer ${tokenResponse.accessToken}"
 
-                // 2. Com o token, busca os dados do utilizador (incluindo ID)
-                val userResponse = Api.retrofitService.getCurrentUser(token)
+                val userResponse = apiService.getCurrentUser(token)
                 val userId = userResponse.id
 
-                // 3. Guarda o token E o userId
                 tokenManager.saveAuthData(tokenResponse.accessToken, userId)
 
                 _loginState.value = LoginUIState.Success(tokenResponse.accessToken)
@@ -59,7 +58,6 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 tokenManager.clearAuthData()
 
-                // Tratamento de erros detalhado
                 val (message, errorType) = when (e) {
                     is HttpException -> {
                         when (e.code()) {

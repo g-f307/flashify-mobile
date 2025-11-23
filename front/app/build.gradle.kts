@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android") // ✅ ADICIONAR
 }
 
 android {
@@ -85,17 +86,16 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.8.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
 
-    // ===== GOOGLE SIGN-IN - ADICIONE ESTAS LINHAS =====
-
-    // Google Play Services Auth
+    // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.0.0")
-
-    // Credential Manager (API moderna do Google)
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-
-    // Google ID para Credential Manager
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // ✅ HILT - ADICIONAR
+    implementation("com.google.dagger:hilt-android:2.51")
+    ksp("com.google.dagger:hilt-android-compiler:2.51")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 }

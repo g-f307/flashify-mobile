@@ -3,7 +3,8 @@ package com.example.flashify.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashify.model.data.UserCreateRequest
-import com.example.flashify.model.network.Api
+import com.example.flashify.model.network.ApiService
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -12,6 +13,7 @@ import retrofit2.HttpException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import javax.inject.Inject
 
 sealed class RegisterUIState {
     object Idle : RegisterUIState()
@@ -19,11 +21,14 @@ sealed class RegisterUIState {
     data class Success(val message: String) : RegisterUIState()
     data class Error(
         val message: String,
-        val field: String? = null // Campo específico com erro
+        val field: String? = null
     ) : RegisterUIState()
 }
 
-class RegisterViewModel : ViewModel() {
+@HiltViewModel
+class RegisterViewModel @Inject constructor(
+    private val apiService: ApiService
+) : ViewModel() {
 
     private val _registerState = MutableStateFlow<RegisterUIState>(RegisterUIState.Idle)
     val registerState: StateFlow<RegisterUIState> = _registerState
@@ -39,7 +44,7 @@ class RegisterViewModel : ViewModel() {
                     password = password
                 )
 
-                val response = Api.retrofitService.registerUser(userRequest)
+                val response = apiService.registerUser(userRequest)
 
                 _registerState.value = RegisterUIState.Success(
                     "Conta criada com sucesso! Faça login para continuar."
@@ -50,7 +55,6 @@ class RegisterViewModel : ViewModel() {
                     is HttpException -> {
                         when (e.code()) {
                             400 -> {
-                                // Tenta extrair detalhes do erro do corpo da resposta
                                 try {
                                     val errorBody = e.response()?.errorBody()?.string()
                                     if (errorBody != null) {
@@ -88,7 +92,6 @@ class RegisterViewModel : ViewModel() {
                                 }
                             }
                             409 -> {
-                                // Conflito - geralmente usuário ou email já existe
                                 val errorBody = e.response()?.errorBody()?.string()
                                 if (errorBody?.contains("username", ignoreCase = true) == true) {
                                     Pair(

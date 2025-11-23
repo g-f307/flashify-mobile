@@ -1,18 +1,19 @@
 package com.example.flashify.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.util.Log
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashify.model.data.CheckAnswerRequest
 import com.example.flashify.model.data.CheckAnswerResponse
 import com.example.flashify.model.data.QuizResponse
 import com.example.flashify.model.data.SubmitQuizRequest
 import com.example.flashify.model.manager.TokenManager
-import com.example.flashify.model.network.Api
+import com.example.flashify.model.network.ApiService
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import android.util.Log
+import javax.inject.Inject
 
 sealed class QuizState {
     object Idle : QuizState()
@@ -35,9 +36,11 @@ sealed class QuizSubmitState {
     data class Error(val message: String) : QuizSubmitState()
 }
 
-class QuizViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val tokenManager = TokenManager(application)
+@HiltViewModel
+class QuizViewModel @Inject constructor(
+    private val tokenManager: TokenManager,
+    private val apiService: ApiService
+) : ViewModel() {
 
     private val _quizState = MutableStateFlow<QuizState>(QuizState.Idle)
     val quizState: StateFlow<QuizState> = _quizState
@@ -58,7 +61,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                val documentDetail = Api.retrofitService.getDocumentDetailWithQuiz(token, documentId)
+                val documentDetail = apiService.getDocumentDetailWithQuiz(token, documentId)
 
                 if (documentDetail.quiz != null) {
                     _quizState.value = QuizState.Success(documentDetail.quiz)
@@ -82,7 +85,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val request = CheckAnswerRequest(questionId, answerId)
-                val result = Api.retrofitService.checkQuizAnswer(token, request)
+                val result = apiService.checkQuizAnswer(token, request)
 
                 _answerCheckState.value = AnswerCheckState.Success(result)
             } catch (e: Exception) {
@@ -102,7 +105,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val request = SubmitQuizRequest(score, correctAnswers, totalQuestions)
-                Api.retrofitService.submitQuizAttempt(token, quizId, request)
+                apiService.submitQuizAttempt(token, quizId, request)
 
                 _quizSubmitState.value = QuizSubmitState.Success
             } catch (e: Exception) {
@@ -119,13 +122,12 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
         _quizSubmitState.value = QuizSubmitState.Idle
     }
 
-    // ✅ NOVA FUNÇÃO ADICIONADA
     fun refreshDeckStats(documentId: Int, onStatsUpdated: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 val token = tokenManager.getToken() ?: return@launch
 
-                val stats = Api.retrofitService.getDocumentStats(token, documentId)
+                val stats = apiService.getDocumentStats(token, documentId)
 
                 Log.d("QuizViewModel", """
                     📊 Stats atualizadas para deck $documentId:

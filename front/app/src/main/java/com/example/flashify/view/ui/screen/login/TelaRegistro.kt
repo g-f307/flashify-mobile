@@ -25,8 +25,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.R
 import com.example.flashify.model.util.LOGIN_SCREEN_ROUTE
@@ -36,7 +36,7 @@ import com.example.flashify.viewmodel.RegisterViewModel
 @Composable
 fun TelaRegistro(
     navController: NavController,
-    viewModel: RegisterViewModel = viewModel()
+    viewModel: RegisterViewModel = hiltViewModel() // ✅ ATUALIZADO
 ) {
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -45,7 +45,6 @@ fun TelaRegistro(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
-    // Erros de validação
     var usernameError by remember { mutableStateOf<String?>(null) }
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
@@ -54,12 +53,10 @@ fun TelaRegistro(
     val uiState by viewModel.registerState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // Obter configuração da tela
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     val screenWidth = configuration.screenWidthDp.dp
 
-    // Calcular tamanhos responsivos
     val isSmallScreen = screenHeight < 650.dp
     val isVerySmallScreen = screenHeight < 550.dp
     val isLargeScreen = screenWidth > 600.dp
@@ -117,12 +114,10 @@ fun TelaRegistro(
         else -> 12.sp
     }
 
-    // Função de validação de email
     fun isValidEmail(email: String): Boolean {
         return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     }
 
-    // Função de validação de senha forte
     fun validatePasswordStrength(password: String): String? {
         return when {
             password.length < 8 -> "Mínimo 8 caracteres"
@@ -133,7 +128,6 @@ fun TelaRegistro(
         }
     }
 
-    // Função de validação completa
     fun validateFields(): Boolean {
         var isValid = true
 
@@ -195,7 +189,6 @@ fun TelaRegistro(
         return isValid
     }
 
-    // Observar estado da UI
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is RegisterUIState.Success -> {
@@ -279,7 +272,6 @@ fun TelaRegistro(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Logo
                 Image(
                     painter = painterResource(id = R.drawable.flashify),
                     contentDescription = "Logo Flashify",
@@ -287,7 +279,6 @@ fun TelaRegistro(
                 )
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Textos de boas-vindas
                 Text(
                     text = "Crie a sua conta",
                     fontSize = titleSize,
@@ -303,7 +294,6 @@ fun TelaRegistro(
                 )
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Campo Nome de Utilizador
                 OutlinedTextField(
                     value = username,
                     onValueChange = {
@@ -328,7 +318,6 @@ fun TelaRegistro(
                 )
                 Spacer(modifier = Modifier.height(verticalSpacing))
 
-                // Campo de Email
                 OutlinedTextField(
                     value = email,
                     onValueChange = {
@@ -352,7 +341,6 @@ fun TelaRegistro(
                 )
                 Spacer(modifier = Modifier.height(verticalSpacing))
 
-                // Campo de Senha
                 OutlinedTextField(
                     value = password,
                     onValueChange = {
@@ -396,7 +384,6 @@ fun TelaRegistro(
                 )
                 Spacer(modifier = Modifier.height(verticalSpacing))
 
-                // Campo de Confirmação de Senha
                 OutlinedTextField(
                     value = confirmPassword,
                     onValueChange = {
@@ -439,7 +426,6 @@ fun TelaRegistro(
                 )
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Botão Criar conta
                 Button(
                     onClick = {
                         if (validateFields()) {
@@ -470,11 +456,9 @@ fun TelaRegistro(
 
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Divisor "OU CONTINUE COM"
                 OrDivider(isSmallScreen = isSmallScreen)
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Botão Entrar com Google
                 GoogleSignInButton(
                     onClick = { /* TODO: Lógica de login com Google */ },
                     isSmallScreen = isSmallScreen,
@@ -483,7 +467,6 @@ fun TelaRegistro(
 
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Link para Iniciar Sessão
                 ClickableText(
                     text = AnnotatedString("Já tem uma conta? Faça login"),
                     onClick = {

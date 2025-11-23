@@ -1,6 +1,5 @@
 package com.example.flashify.view.ui.screen.login
 
-import android.app.Application
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -28,9 +27,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModelProvider
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.R
 import com.example.flashify.model.util.MAIN_SCREEN_ROUTE
@@ -46,31 +44,22 @@ fun TelaLogin(navController: NavController) {
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // Erros de validação
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
-    val application = context.applicationContext as Application
 
-    // ViewModels
-    val loginViewModel: LoginViewModel = viewModel(
-        factory = ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-    )
-    val socialLoginViewModel: SocialLoginViewModel = viewModel(
-        factory = ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-    )
+    // ✅ ATUALIZADO: hiltViewModel()
+    val loginViewModel: LoginViewModel = hiltViewModel()
+    val socialLoginViewModel: SocialLoginViewModel = hiltViewModel()
 
-    // Estados
     val loginState by loginViewModel.loginState.collectAsStateWithLifecycle()
     val socialLoginState by socialLoginViewModel.socialLoginState.collectAsStateWithLifecycle()
 
-    // Obter configuração da tela
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     val screenWidth = configuration.screenWidthDp.dp
 
-    // Calcular tamanhos responsivos
     val isSmallScreen = screenHeight < 600.dp
     val isVerySmallScreen = screenHeight < 500.dp
     val isLargeScreen = screenWidth > 600.dp
@@ -116,7 +105,6 @@ fun TelaLogin(navController: NavController) {
         else -> 50.dp
     }
 
-    // Função de validação
     fun validateFields(): Boolean {
         var isValid = true
 
@@ -147,7 +135,6 @@ fun TelaLogin(navController: NavController) {
         return isValid
     }
 
-    // Observar estado de login tradicional
     LaunchedEffect(loginState) {
         when (val state = loginState) {
             is LoginUIState.Success -> {
@@ -186,7 +173,6 @@ fun TelaLogin(navController: NavController) {
         }
     }
 
-    // Observar estado de login social
     LaunchedEffect(socialLoginState) {
         when (val state = socialLoginState) {
             is SocialLoginUIState.Success -> {
@@ -238,7 +224,6 @@ fun TelaLogin(navController: NavController) {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // Logo
                 Image(
                     painter = painterResource(id = R.drawable.flashify),
                     contentDescription = "Logo Flashify",
@@ -246,7 +231,6 @@ fun TelaLogin(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Título
                 Text(
                     text = "Bem-vindo de volta!",
                     fontSize = titleSize,
@@ -262,7 +246,6 @@ fun TelaLogin(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Campo Email/Username
                 OutlinedTextField(
                     value = emailOrUsername,
                     onValueChange = {
@@ -286,7 +269,6 @@ fun TelaLogin(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(verticalSpacing))
 
-                // Campo Senha
                 OutlinedTextField(
                     value = password,
                     onValueChange = {
@@ -329,7 +311,6 @@ fun TelaLogin(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Botão Login
                 Button(
                     onClick = {
                         if (validateFields()) {
@@ -362,7 +343,6 @@ fun TelaLogin(navController: NavController) {
                 OrDivider(isSmallScreen = isSmallScreen)
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Botão Google Sign-In
                 GoogleSignInButton(
                     onClick = { socialLoginViewModel.signInWithGoogle() },
                     isLoading = socialLoginState is SocialLoginUIState.Loading,
@@ -372,7 +352,6 @@ fun TelaLogin(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(sectionSpacing))
 
-                // Link para registro
                 ClickableText(
                     text = AnnotatedString("Ainda não tem uma conta? Registre-se"),
                     onClick = { navController.navigate(REGISTER_SCREEN_ROUTE) },

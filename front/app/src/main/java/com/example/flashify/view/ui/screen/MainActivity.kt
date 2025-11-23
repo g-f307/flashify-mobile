@@ -9,16 +9,18 @@ import androidx.compose.runtime.getValue
 import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.AppNavigation
 import com.example.flashify.view.ui.theme.FlashifyTheme
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private lateinit var themeManager: ThemeManager
+    @Inject
+    lateinit var themeManager: ThemeManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        themeManager = ThemeManager(this)
 
         setContent {
             val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = true)

@@ -23,8 +23,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.NavItem
@@ -40,35 +40,28 @@ import kotlinx.coroutines.launch
 @Composable
 fun TelaPrincipal(
     navController: NavController,
-    deckViewModel: DeckViewModel = viewModel(),
-    homeViewModel: HomeViewModel = viewModel()
+    deckViewModel: DeckViewModel = hiltViewModel(), // ✅ ATUALIZADO
+    homeViewModel: HomeViewModel = hiltViewModel()  // ✅ ATUALIZADO
 ) {
-    // Estados dos ViewModels
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsState()
 
-    // Observa o ciclo de vida da tela para recarregar os dados
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            // Se o evento for ON_RESUME, significa que a tela
-            // voltou a ficar visível (ex: ao voltar de outra tela)
             if (event == Lifecycle.Event.ON_RESUME) {
                 homeViewModel.refresh()
                 deckViewModel.fetchDecks()
             }
         }
 
-        // Adiciona o observador
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        // Remove o observador ao sair da tela
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
-    // Lógica da barra de navegação
     var selectedItem by remember { mutableStateOf(0) }
     val navItems = listOf(
         NavItem("Início", Icons.Default.Home),
@@ -152,7 +145,7 @@ fun TelaPrincipal(
 @Composable
 fun CabecalhoUsuario(
     homeViewModel: HomeViewModel,
-    settingsViewModel: SettingsViewModel = viewModel()
+    settingsViewModel: SettingsViewModel = hiltViewModel() // ✅ ATUALIZADO
 ) {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
@@ -228,7 +221,6 @@ fun CabecalhoUsuario(
             }
         }
 
-        // Botão de tema (agora funcional!)
         IconButton(
             onClick = {
                 scope.launch {
@@ -480,7 +472,6 @@ fun CartaoProgresso(modifier: Modifier = Modifier, state: HomeUiState) {
 @Composable
 fun SecaoContinuarEstudando(state: DeckListState, navController: NavController) {
     if (state is DeckListState.Success && state.decks.isNotEmpty()) {
-        // Pegar os 5 decks mais recentes
         val recentDecks = state.decks.take(5)
 
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -524,7 +515,6 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Cabeçalho com ícone e título
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -553,12 +543,10 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
 
             Spacer(Modifier.height(8.dp))
 
-            // Badges de Flashcards e Quiz
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Badge Flashcards
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -583,7 +571,6 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                     )
                 }
 
-                // Badge Quiz (se houver)
                 if (deck.hasQuiz) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -613,7 +600,6 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
 
             Spacer(Modifier.height(8.dp))
 
-            // Botão de estudar
             Button(
                 onClick = onClick,
                 shape = RoundedCornerShape(10.dp),
