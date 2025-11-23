@@ -25,8 +25,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.FolderWithDocumentsResponse
@@ -41,8 +41,8 @@ import com.example.flashify.viewmodel.*
 @Composable
 fun TelaPrincipalBiblioteca(
     navController: NavController,
-    deckViewModel: DeckViewModel = viewModel(),
-    folderViewModel: FolderViewModel = viewModel()
+    deckViewModel: DeckViewModel = hiltViewModel(), // ✅ ATUALIZADO
+    folderViewModel: FolderViewModel = hiltViewModel() // ✅ ATUALIZADO
 ) {
     val deckActionState by deckViewModel.deckActionState.collectAsStateWithLifecycle()
     val libraryState by folderViewModel.libraryState.collectAsStateWithLifecycle()
@@ -56,7 +56,7 @@ fun TelaPrincipalBiblioteca(
     var showMoveToPastaDialog by remember { mutableStateOf(false) }
     var deckToActOn by remember { mutableStateOf<DeckResponse?>(null) }
 
-    // ✅ NOVOS ESTADOS para diálogos de PASTA
+    // Estados para diálogos de PASTA
     var showEditFolderDialog by remember { mutableStateOf(false) }
     var showDeleteFolderDialog by remember { mutableStateOf(false) }
     var folderToActOn by remember { mutableStateOf<FolderWithDocumentsResponse?>(null) }
@@ -143,7 +143,7 @@ fun TelaPrincipalBiblioteca(
         )
     }
 
-    // ✅ NOVOS DIÁLOGOS DE PASTA
+    // Diálogos de PASTA
     if (showEditFolderDialog && folderToActOn != null) {
         EditFolderDialog(
             currentName = folderToActOn!!.name,
@@ -356,7 +356,6 @@ fun TelaPrincipalBiblioteca(
                                 }
                             }
 
-                            // ✅ LISTA DE PASTAS COM MENU
                             items(
                                 items = state.library.folders,
                                 key = { folder -> "Folder-${folder.id}" }
@@ -451,7 +450,6 @@ fun TelaPrincipalBiblioteca(
     }
 }
 
-// ✅ NOVO COMPONENTE: FolderItem COM MENU DE OPÇÕES
 @Composable
 fun FolderItemWithMenu(
     folder: FolderWithDocumentsResponse,

@@ -25,8 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.util.BIBLIOTECA_SCREEN_ROUTE
 import com.example.flashify.model.util.MAIN_SCREEN_ROUTE
@@ -64,16 +64,13 @@ enum class StepStatus {
     COMPLETED
 }
 
-//
-// ▼▼▼ FUNÇÃO ATUALIZADA ▼▼▼
-//
 @Composable
 fun TelaContentLoader(
     navController: NavController,
     documentId: Int,
     generatesFlashcards: Boolean,
     generatesQuizzes: Boolean,
-    viewModel: DeckViewModel = viewModel()
+    viewModel: DeckViewModel = hiltViewModel()
 ) {
     val processingState by viewModel.documentProcessingState.collectAsStateWithLifecycle()
 
@@ -98,33 +95,25 @@ fun TelaContentLoader(
     }
 
     GradientBackgroundScreen {
-        // 1. Adiciona o Scaffold para gerir os insets (barras do sistema)
         Scaffold(
-            containerColor = Color.Transparent // Mantém o gradiente visível
-        ) { innerPadding -> // 2. O Scaffold fornece o padding da "área segura"
+            containerColor = Color.Transparent
+        ) { innerPadding ->
             ContentLoaderContent(
                 processingState = processingState,
                 generatesFlashcards = generatesFlashcards,
                 generatesQuizzes = generatesQuizzes,
-                // 3. Passa o padding para o conteúdo
                 modifier = Modifier.padding(innerPadding)
             )
         }
     }
 }
-//
-// ▲▲▲ FIM DA ATUALIZAÇÃO ▲▲▲
-//
 
-//
-// ▼▼▼ FUNÇÃO ATUALIZADA ▼▼▼
-//
 @Composable
 fun ContentLoaderContent(
     processingState: DocumentProcessingState,
     generatesFlashcards: Boolean,
     generatesQuizzes: Boolean,
-    modifier: Modifier = Modifier // 4. Recebe o modifier com o padding
+    modifier: Modifier = Modifier
 ) {
     val currentStepMessage = when (processingState) {
         is DocumentProcessingState.Processing -> processingState.currentStep ?: ""
@@ -162,7 +151,6 @@ fun ContentLoaderContent(
 
     val finalActiveIndex = if (activeStepIndex == -1 && !isCompleted) 0 else activeStepIndex
 
-    // Calcula o progresso geral
     val progress = if (isCompleted) {
         1f
     } else if (finalActiveIndex >= 0) {
@@ -171,17 +159,14 @@ fun ContentLoaderContent(
         0f
     }
 
-    // Esta Column principal agora gere as 3 secções (Cabeçalho, Lista, Rodapé)
     Column(
-        // 5. Aplica o modifier do Scaffold aqui
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp)
-            .padding(top = 16.dp, bottom = 32.dp), // Padding vertical original mantido
+            .padding(top = 16.dp, bottom = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // --- SECÇÃO 1: CABEÇALHO (Fixo no topo) ---
         HeaderSection(
             generatesFlashcards = generatesFlashcards,
             generatesQuizzes = generatesQuizzes,
@@ -195,12 +180,11 @@ fun ContentLoaderContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- SECÇÃO 2: LISTA DE PASSOS (Flexível e Rolável) ---
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f) // Ocupa o espaço central
-                .verticalScroll(rememberScrollState()), // Rola apenas esta lista
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             processingSteps.forEachIndexed { index, step ->
@@ -219,7 +203,6 @@ fun ContentLoaderContent(
             }
         }
 
-        // --- SECÇÃO 3: RODAPÉ (Fixo em baixo) ---
         Spacer(modifier = Modifier.height(20.dp))
 
         if (isCompleted) {
@@ -231,9 +214,6 @@ fun ContentLoaderContent(
         }
     }
 }
-//
-// ▲▲▲ FIM DA ATUALIZAÇÃO ▲▲▲
-//
 
 @Composable
 fun HeaderSection(
@@ -246,7 +226,6 @@ fun HeaderSection(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Ícone principal compacto
         val infiniteTransition = rememberInfiniteTransition(label = "pulse")
         val scale by infiniteTransition.animateFloat(
             initialValue = 1f,
@@ -283,7 +262,6 @@ fun HeaderSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Título compacto
         Text(
             text = if (isCompleted) "Concluído!" else getTitle(generatesFlashcards, generatesQuizzes),
             fontSize = 22.sp,
@@ -296,7 +274,6 @@ fun HeaderSection(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Subtítulo compacto
         Text(
             text = if (isCompleted)
                 "Seu material está pronto!"
@@ -311,7 +288,6 @@ fun HeaderSection(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Porcentagem de progresso
         Text(
             text = "${(progress * 100).toInt()}%",
             fontSize = 15.sp,
@@ -424,7 +400,6 @@ fun ProcessingStepItem(
                     }
                 }
 
-                // Indicador visual de status
                 StatusIndicator(status = status)
             }
         }

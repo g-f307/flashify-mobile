@@ -25,9 +25,9 @@ fun TelaResultadoQuiz(
     quizId: Int,
     totalQuestions: Int,
     correctAnswers: Int,
-    onRetry: () -> Unit, // Mantido para possível uso futuro, mas o botão foi removido
+    onRetry: () -> Unit,
     onFinish: () -> Unit,
-    viewModel: QuizViewModel
+    viewModel: QuizViewModel // Recebe o ViewModel injetado na tela pai
 ) {
     val submitState by viewModel.quizSubmitState.collectAsStateWithLifecycle()
     val score = if (totalQuestions > 0) {
@@ -46,8 +46,6 @@ fun TelaResultadoQuiz(
             totalQuestions = totalQuestions
         )
     }
-
-    // ▼▼▼ UI SUBSTITUÍDA PELO DIÁLOGO DE CONCLUSÃO ▼▼▼
 
     AlertDialog(
         onDismissRequest = onFinish,
@@ -102,7 +100,6 @@ fun TelaResultadoQuiz(
                     Spacer(Modifier.height(16.dp))
                 }
 
-
                 // Estatísticas
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -140,7 +137,7 @@ fun TelaResultadoQuiz(
         },
         confirmButton = {
             Button(
-                onClick = onFinish, // O botão "Finalizar" agora usa a ação onFinish
+                onClick = onFinish,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = YellowAccent,
                     contentColor = Color.Black

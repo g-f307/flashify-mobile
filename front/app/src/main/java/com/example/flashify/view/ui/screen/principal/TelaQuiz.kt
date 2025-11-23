@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.AnswerResponse
 import com.example.flashify.model.data.QuestionResponse
@@ -41,20 +41,13 @@ import kotlinx.coroutines.delay
 fun TelaQuiz(
     navController: NavController,
     documentId: Int,
-    viewModel: QuizViewModel = viewModel()
+    viewModel: QuizViewModel = hiltViewModel() // ✅ Atualizado
 ) {
     val quizState by viewModel.quizState.collectAsStateWithLifecycle()
-    // val quizSubmitState by viewModel.quizSubmitState.collectAsStateWithLifecycle() // Não é mais necessário aqui
 
     LaunchedEffect(documentId) {
         viewModel.loadQuiz(documentId)
     }
-
-    // ▼▼▼ REMOVIDO ▼▼▼
-    // O LaunchedEffect(quizSubmitState) foi removido.
-    // Agora, a navegação de volta é controlada apenas pelo
-    // botão "Finalizar" na TelaResultadoQuiz.
-    // ▲▲▲ FIM DA REMOÇÃO ▲▲▲
 
     GradientBackgroundScreen {
         Scaffold(
@@ -112,7 +105,6 @@ fun TelaQuiz(
         }
     }
 }
-
 @Composable
 fun QuizContent(
     quiz: QuizResponse,

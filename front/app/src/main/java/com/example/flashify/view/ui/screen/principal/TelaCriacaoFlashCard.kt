@@ -24,11 +24,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.NavItem
 import com.example.flashify.model.util.*
@@ -43,7 +42,7 @@ import kotlin.math.roundToInt
 @Composable
 fun TelaCriacaoFlashCard(
     navController: NavController,
-    viewModel: DeckViewModel = viewModel(),
+    viewModel: DeckViewModel = hiltViewModel(), // ✅ Atualizado para hiltViewModel()
     folderId: Int? = null
 ) {
     var currentStep by remember { mutableStateOf(1) }
@@ -54,7 +53,7 @@ fun TelaCriacaoFlashCard(
     var creationMode by remember { mutableStateOf("text") }
     var includeQuiz by remember { mutableStateOf(false) }
 
-    // ✅ NOVOS ESTADOS PARA CUSTOMIZAÇÃO DE QUIZ
+    // Estados para customização de Quiz
     var quizQuantity by remember { mutableStateOf(5f) }
     var difficulty by remember { mutableStateOf("Médio") }
 

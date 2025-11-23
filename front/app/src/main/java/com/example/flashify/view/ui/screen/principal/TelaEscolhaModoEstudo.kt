@@ -23,8 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.util.ESTUDO_SCREEN_ROUTE
 import com.example.flashify.model.util.QUIZ_SCREEN_ROUTE
@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 fun TelaEscolhaModoEstudo(
     navController: NavController,
     deckId: Int,
-    deckViewModel: DeckViewModel = viewModel()
+    deckViewModel: DeckViewModel = hiltViewModel() // ✅ Atualizado
 ) {
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
     val statsState by deckViewModel.deckStatsState.collectAsStateWithLifecycle()
@@ -60,11 +60,9 @@ fun TelaEscolhaModoEstudo(
     var previousHasQuiz by remember { mutableStateOf(deck?.hasQuiz ?: false) }
     var previousFlashcardsTotal by remember { mutableStateOf(0) }
 
-    // SnackbarHost para mostrar mensagens
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    // Observa se voltou de um quiz completado
     val navBackStackEntry = navController.currentBackStackEntry
     LaunchedEffect(navBackStackEntry) {
         val quizCompleted = navBackStackEntry
@@ -77,10 +75,7 @@ fun TelaEscolhaModoEstudo(
         }
     }
 
-    // Carrega os dados do deck E as estatísticas na primeira vez
     LaunchedEffect(deckId) {
-        println("🚀 INICIALIZANDO TelaEscolhaModoEstudo para deck $deckId")
-
         deckViewModel.resetStatsState()
         deckViewModel.fetchDeckStats(deckId)
 
@@ -88,21 +83,17 @@ fun TelaEscolhaModoEstudo(
             deckViewModel.fetchDecks()
         }
 
-        // Inicializa os valores anteriores após carregar os dados
         delay(1000)
         deck?.let {
             previousHasQuiz = it.hasQuiz
-            println("   Inicializado previousHasQuiz = ${it.hasQuiz}")
         }
 
         val currentStatsState = deckViewModel.deckStatsState.value
         if (currentStatsState is DeckStatsState.Success) {
             previousFlashcardsTotal = currentStatsState.stats.flashcards.total
-            println("   Inicializado previousFlashcardsTotal = $previousFlashcardsTotal")
         }
     }
 
-    // Recarrega TUDO quando shouldRefresh é true
     LaunchedEffect(shouldRefresh) {
         if (shouldRefresh) {
             delay(500)
@@ -112,138 +103,70 @@ fun TelaEscolhaModoEstudo(
         }
     }
 
-    // Atualiza o deck quando o estado muda
     LaunchedEffect(deckState) {
         if (deckState is DeckListState.Success) {
             val updatedDeck = (deckState as DeckListState.Success).decks.find { it.id == deckId }
             if (updatedDeck != null) {
-                val deckChanged = updatedDeck != deck
-
-                // 🔴 ALTERADO: Lógica de parada simplificada e absoluta
                 if (isCreatingQuiz && updatedDeck.hasQuiz) {
-                    println("🎉 QUIZ DETECTADO! Parando loading do quiz...")
                     isCreatingQuiz = false
                 }
-
                 previousHasQuiz = updatedDeck.hasQuiz
                 deck = updatedDeck
-            } else {
-                println("⚠️ Deck não encontrado na lista!")
             }
         }
     }
 
-    // Força atualização quando stats mudam
     LaunchedEffect(statsState) {
         when (val currentStatsState = statsState) {
             is DeckStatsState.Success -> {
                 val flashcardsTotal = currentStatsState.stats.flashcards.total
-                val hasQuizInStats = currentStatsState.stats.quiz != null
-
-                // 🔴 ALTERADO: Lógica de parada simplificada e absoluta
                 if (isCreatingFlashcards && flashcardsTotal > 0) {
-                    println("🎉 FLASHCARDS DETECTADOS! Parando loading dos flashcards...")
                     isCreatingFlashcards = false
                 }
-
                 previousFlashcardsTotal = flashcardsTotal
-            }
-            is DeckStatsState.Loading -> {
-                println("📊 Stats: Loading...")
-            }
-            is DeckStatsState.Error -> {
-                println("❌ Stats Error: ${currentStatsState.message}")
             }
             else -> {}
         }
     }
 
-    // Observa o estado de ação e recarrega quando uma ação é bem-sucedida
     LaunchedEffect(actionState) {
         when (val currentActionState = actionState) {
             is DeckActionState.Success -> {
-                println("=" .repeat(60))
-                println("✅ AÇÃO BEM-SUCEDIDA!")
-                println("   Mensagem: ${currentActionState.message}")
-
                 val message = currentActionState.message
-
-                // Inicia o polling: recarrega dados repetidamente até detectar mudança
                 var attempts = 0
-                val maxAttempts = 45 // 45 segundos (cada delay é aprox 1s no total com rede)
+                val maxAttempts = 45
 
                 while (attempts < maxAttempts) {
                     attempts++
-
-                    // Se já detectou mudança (pelas variáveis observadas nos outros LaunchedEffect), sai
                     if (!isCreatingFlashcards && !isCreatingQuiz) {
-                        println("\n✅ SUCESSO! Conteúdo detectado pelos observadores!")
                         break
                     }
-
-                    println("\n🔄 POLLING SILENCIOSO - Tentativa $attempts/$maxAttempts")
-
-                    // 🔴 ALTERADO: Usa showLoading = false para não piscar a tela
                     deckViewModel.fetchDecks(showLoading = false)
                     deckViewModel.fetchDeckStats(deckId, showLoading = false)
-
                     delay(2000)
                 }
 
-                // Timeout: força parar os loadings
                 if (isCreatingFlashcards || isCreatingQuiz) {
-                    println("\n⏱️ TIMEOUT ATINGIDO após $attempts tentativas")
                     isCreatingFlashcards = false
                     isCreatingQuiz = false
-
-                    // Faz um último refresh VISÍVEL
                     deckViewModel.fetchDecks(showLoading = true)
                     deckViewModel.fetchDeckStats(deckId, showLoading = true)
                 }
 
-                println("\n🎉 Finalizando ação...")
-
-                // Mostra mensagem de sucesso
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar(
-                        message = message,
-                        duration = SnackbarDuration.Short
-                    )
+                    snackbarHostState.showSnackbar(message = message, duration = SnackbarDuration.Short)
                 }
-
                 deckViewModel.resetActionState()
             }
             is DeckActionState.Error -> {
-                println("❌ ERRO NA AÇÃO: ${currentActionState.message}")
-
-                // Para o loading em caso de erro
                 isCreatingFlashcards = false
                 isCreatingQuiz = false
-
-                // Mostra mensagem de erro
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar(
-                        message = currentActionState.message,
-                        duration = SnackbarDuration.Long
-                    )
+                    snackbarHostState.showSnackbar(message = currentActionState.message, duration = SnackbarDuration.Long)
                 }
-
                 deckViewModel.resetActionState()
             }
-            is DeckActionState.Loading -> {
-                println("⏳ Ação em andamento...")
-            }
             else -> {}
-        }
-    }
-
-    // Observa mudanças no deckState e statsState para atualizar o deck local
-    LaunchedEffect(deckState, statsState) {
-        if (deckState is DeckListState.Success) {
-            val updatedDeck = (deckState as DeckListState.Success).decks.find { it.id == deckId }
-            if (updatedDeck != null) {
-                deck = updatedDeck
-            }
         }
     }
 
@@ -296,29 +219,18 @@ fun TelaEscolhaModoEstudo(
             ) {
                 when {
                     (deckState is DeckListState.Loading || statsState is DeckStatsState.Loading) && deck == null -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(color = YellowAccent)
                         }
                     }
                     deckState is DeckListState.Error -> {
-                        ErrorContent(
-                            onRetry = { deckViewModel.fetchDecks() },
-                            onBack = { navController.popBackStack() }
-                        )
+                        ErrorContent(onRetry = { deckViewModel.fetchDecks() }, onBack = { navController.popBackStack() })
                     }
                     deck == null -> {
                         if (statsState is DeckStatsState.Error) {
-                            ErrorContent(
-                                onRetry = { deckViewModel.fetchDeckStats(deckId) },
-                                onBack = { navController.popBackStack() }
-                            )
+                            ErrorContent(onRetry = { deckViewModel.fetchDeckStats(deckId) }, onBack = { navController.popBackStack() })
                         } else {
-                            DeckNotFoundContent(
-                                onBack = { navController.popBackStack() }
-                            )
+                            DeckNotFoundContent(onBack = { navController.popBackStack() })
                         }
                     }
                     else -> {

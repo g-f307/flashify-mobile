@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.util.*
@@ -37,8 +37,8 @@ fun TelaDetalhePasta(
     navController: NavController,
     folderId: Int,
     folderName: String,
-    folderViewModel: FolderViewModel = viewModel(),
-    deckViewModel: DeckViewModel = viewModel()
+    folderViewModel: FolderViewModel = hiltViewModel(), // ✅ Atualizado
+    deckViewModel: DeckViewModel = hiltViewModel()      // ✅ Atualizado
 ) {
     val libraryState by folderViewModel.libraryState.collectAsStateWithLifecycle()
     val deckActionState by deckViewModel.deckActionState.collectAsStateWithLifecycle()
@@ -51,7 +51,7 @@ fun TelaDetalhePasta(
     var showMoveToPastaDialog by remember { mutableStateOf(false) }
     var deckToActOn by remember { mutableStateOf<DeckResponse?>(null) }
 
-    // ✅ NOVO: Estado para diálogo de excluir pasta
+    // Estado para diálogo de excluir pasta
     var showDeleteFolderDialog by remember { mutableStateOf(false) }
 
     // Buscar a pasta específica do estado da biblioteca
@@ -98,7 +98,7 @@ fun TelaDetalhePasta(
         }
     }
 
-    // ✅ NOVO: Feedback de ações de pasta
+    // Feedback de ações de pasta
     LaunchedEffect(folderOperationState) {
         when (val state = folderOperationState) {
             is FolderOperationState.Success -> {
@@ -116,7 +116,7 @@ fun TelaDetalhePasta(
         }
     }
 
-    // Diálogos
+    // Diálogos e UI
     if (showDeleteDeckDialog && deckToActOn != null) {
         DeleteDeckDialogInFolder(
             deckName = deckToActOn!!.filePath,
@@ -155,7 +155,6 @@ fun TelaDetalhePasta(
         )
     }
 
-    // ✅ NOVO: Diálogo de excluir pasta
     if (showDeleteFolderDialog && currentFolder != null) {
         DeleteFolderDialogInFolder(
             folderName = currentFolder.name,
@@ -199,7 +198,6 @@ fun TelaDetalhePasta(
                         }
                     },
                     actions = {
-                        // ✅ NOVO: Botão de excluir pasta na AppBar
                         IconButton(
                             onClick = { showDeleteFolderDialog = true }
                         ) {
@@ -259,11 +257,9 @@ fun TelaDetalhePasta(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             contentPadding = PaddingValues(vertical = 16.dp)
                         ) {
-                            // ✅ BOTÃO "CRIAR DECK" SEMPRE VISÍVEL - AGORA CRIA DENTRO DA PASTA
                             item {
                                 Button(
                                     onClick = {
-                                        // Navegar para criação passando o folderId como parâmetro
                                         navController.navigate("$CREATE_FLASHCARD_ROUTE?folderId=$folderId")
                                     },
                                     modifier = Modifier
@@ -290,7 +286,6 @@ fun TelaDetalhePasta(
                                 }
                             }
 
-                            // ✅ ESTADO VAZIO (se não houver decks)
                             if (decksInFolder.isEmpty()) {
                                 item {
                                     Card(
@@ -342,7 +337,6 @@ fun TelaDetalhePasta(
                                     }
                                 }
                             } else {
-                                // ✅ LISTA DE DECKS
                                 items(decksInFolder.size) { index ->
                                     DeckItemCardInFolder(
                                         deck = decksInFolder[index],
@@ -366,16 +360,12 @@ fun TelaDetalhePasta(
                             }
                         }
                     }
-                    is LibraryState.Idle -> {
-                        // Estado inicial - não faz nada, aguarda o LaunchedEffect
-                    }
+                    is LibraryState.Idle -> {}
                 }
             }
         }
     }
 }
-
-// ✅ COMPONENTE DE DECK COM TODAS AS OPÇÕES
 @Composable
 fun DeckItemCardInFolder(
     deck: DeckResponse,

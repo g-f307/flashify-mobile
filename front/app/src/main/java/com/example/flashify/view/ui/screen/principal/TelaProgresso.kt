@@ -26,8 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.NavItem
 import com.example.flashify.model.util.*
@@ -41,7 +41,7 @@ import kotlin.math.roundToInt
 @Composable
 fun TelaProgresso(
     navController: NavController,
-    homeViewModel: HomeViewModel = viewModel()
+    homeViewModel: HomeViewModel = hiltViewModel() // ✅ ATUALIZADO
 ) {
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
 
@@ -225,16 +225,13 @@ fun TelaProgresso(
                             modifier = Modifier.weight(1f)
                         )
 
-                        // ▼▼▼ CAMPO ATUALIZADO ▼▼▼
                         AccuracyCard(
                             title = "Quiz",
-                            // Lê o novo valor de 'quizAverageScore' (que já vem 0-100)
                             percentage = homeState.quizAverageScore.roundToInt(),
                             icon = Icons.Default.Quiz,
                             color = Color(0xFF00BCD4),
                             modifier = Modifier.weight(1f)
                         )
-                        // ▲▲▲ FIM DA ATUALIZAÇÃO ▲▲▲
                     }
 
                     Spacer(Modifier.height(24.dp))

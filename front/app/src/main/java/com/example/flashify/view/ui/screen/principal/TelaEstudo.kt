@@ -20,8 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.flashify.model.data.FlashcardResponse
 import com.example.flashify.view.ui.components.EditFlashcardDialog
@@ -38,7 +38,7 @@ import kotlinx.coroutines.delay
 fun TelaEstudo(
     navController: NavController,
     deckId: Int,
-    viewModel: StudyViewModel = viewModel()
+    viewModel: StudyViewModel = hiltViewModel() // ✅ Atualizado
 ) {
     val uiState by viewModel.studyState.collectAsStateWithLifecycle()
     var elapsedTime by remember { mutableStateOf(0) }
@@ -125,7 +125,6 @@ fun TelaEstudo(
                         }
                     }
                     is StudyState.Success -> {
-                        // ✅ PASSA O VIEWMODEL PARA StudySession
                         StudySession(
                             flashcards = state.flashcards,
                             onLogStudy = { flashcardId, accuracy ->
@@ -135,7 +134,7 @@ fun TelaEstudo(
                                 isTimerRunning = false
                                 navController.popBackStack()
                             },
-                            viewModel = viewModel // ✅ NOVO PARÂMETRO
+                            viewModel = viewModel
                         )
                     }
                 }
@@ -143,8 +142,6 @@ fun TelaEstudo(
         }
     }
 }
-
-
 @Composable
 fun StudySession(
     flashcards: List<FlashcardResponse>,

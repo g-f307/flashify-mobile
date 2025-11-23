@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
-    id("com.google.dagger.hilt.android") // ✅ ADICIONAR
+    alias(libs.plugins.hilt.android)
 }
 
 android {
@@ -95,7 +95,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // ✅ HILT - ADICIONAR
-    implementation("com.google.dagger:hilt-android:2.51")
-    ksp("com.google.dagger:hilt-android-compiler:2.51")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
 }
