@@ -24,6 +24,7 @@ import com.example.flashify.view.ui.components.*
 import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.AddContentState
 import com.example.flashify.viewmodel.DeckViewModel
+import com.example.flashify.viewmodel.GenerationLimitState
 
 @Composable
 fun TelaResultadoEstudo(
@@ -39,43 +40,61 @@ fun TelaResultadoEstudo(
     val score = accuracy * 100
 
     val addContentState by deckViewModel.addContentState.collectAsStateWithLifecycle()
-    val syncCompleted by deckViewModel.syncCompleted.collectAsStateWithLifecycle()
-
-    var showAddDialog by remember { mutableStateOf(false) }
+    val generationLimitState by deckViewModel.generationLimitState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // ✅ MODIFICADO: Observa sincCompleted para redirecionamento automático
-    LaunchedEffect(addContentState, syncCompleted) {
-        when {
-            // ✅ Sucesso + Sincronização completa = REDIRECIONAMENTO AUTOMÁTICO
-            addContentState is AddContentState.Success && syncCompleted -> {
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    // ✅ NOVO: Flag para controlar redirecionamento automático
+    var shouldAutoRedirect by remember { mutableStateOf(false) }
+
+    // ✅ VERIFICAR LIMITE DE GERAÇÕES
+    val hasGenerationLimit = remember(generationLimitState) {
+        if (generationLimitState is GenerationLimitState.Success) {
+            val info = (generationLimitState as GenerationLimitState.Success).info
+            info.used >= info.limit
+        } else {
+            false
+        }
+    }
+
+    // ✅ CORRIGIDO: Fluxo de redirecionamento após sucesso
+    LaunchedEffect(addContentState) {
+        when (val state = addContentState) {
+            is AddContentState.Success -> {
                 Toast.makeText(
                     context,
-                    (addContentState as AddContentState.Success).message,
+                    state.message,
                     Toast.LENGTH_SHORT
                 ).show()
-                showAddDialog = false
-                deckViewModel.resetAddContentState()
 
-                // ✅ Delay mínimo e depois redireciona automaticamente
-                kotlinx.coroutines.delay(500)
-                onRestart()
+                // ✅ FECHA O DIÁLOGO IMEDIATAMENTE
+                showAddDialog = false
+
+                // ✅ MARCA PARA REDIRECIONAMENTO AUTOMÁTICO
+                shouldAutoRedirect = true
+
+                // ✅ AGUARDA 800MS E REDIRECIONA
+                kotlinx.coroutines.delay(800)
+                deckViewModel.resetAddContentState()
+                onRestart() // ✅ REDIRECIONA AUTOMATICAMENTE
             }
 
-            // ❌ Erro na adição de conteúdo
-            addContentState is AddContentState.Error -> {
+            is AddContentState.Error -> {
                 Toast.makeText(
                     context,
-                    (addContentState as AddContentState.Error).message,
+                    state.message,
                     Toast.LENGTH_LONG
                 ).show()
                 deckViewModel.resetAddContentState()
+                showAddDialog = false
             }
 
             else -> {}
         }
     }
 
+    // ✅ DIÁLOGO COM VERIFICAÇÃO DE LIMITE
     if (showAddDialog) {
         AddContentDialog(
             title = "Adicionar Flashcards",
@@ -84,9 +103,16 @@ fun TelaResultadoEstudo(
             currentCount = totalCards,
             maxLimit = 20,
             isLoading = addContentState is AddContentState.Loading,
-            onDismiss = { showAddDialog = false },
+            hasGenerationLimit = hasGenerationLimit,
+            onDismiss = {
+                showAddDialog = false
+                deckViewModel.resetAddContentState()
+            },
             onConfirm = { qtd, difficulty ->
-                deckViewModel.addFlashcardsToDeck(documentId, qtd, difficulty)
+                // ✅ DUPLA VERIFICAÇÃO antes de enviar
+                if (!hasGenerationLimit) {
+                    deckViewModel.addFlashcardsToDeck(documentId, qtd, difficulty)
+                }
             }
         )
     }
@@ -164,16 +190,27 @@ fun TelaResultadoEstudo(
                 if (totalCards < 20) {
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // ✅ MODIFICADO: Botão com estado de loading
                     OutlinedButton(
-                        onClick = { showAddDialog = true },
+                        onClick = {
+                            // ✅ VERIFICAR LIMITE ANTES DE ABRIR DIÁLOGO
+                            if (!hasGenerationLimit) {
+                                showAddDialog = true
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Limite diário de gerações atingido!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         border = BorderStroke(1.5.dp, Color(0xFF26C6DA)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF26C6DA)),
                         shape = RoundedCornerShape(16.dp),
-                        enabled = addContentState !is AddContentState.Loading
+                        // ✅ BOTÃO DESABILITADO se limite atingido OU se está carregando
+                        enabled = !hasGenerationLimit && addContentState !is AddContentState.Loading
                     ) {
                         if (addContentState is AddContentState.Loading) {
                             CircularProgressIndicator(
@@ -182,11 +219,15 @@ fun TelaResultadoEstudo(
                                 strokeWidth = 2.dp
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text("Gerando Flashcards...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Gerando...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         } else {
                             Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
-                            Text("Adicionar Flashcards", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (hasGenerationLimit) "Limite Atingido" else "Adicionar Flashcards",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

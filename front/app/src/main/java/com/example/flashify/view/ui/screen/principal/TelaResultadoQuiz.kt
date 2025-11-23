@@ -24,6 +24,7 @@ import com.example.flashify.view.ui.components.*
 import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.AddContentState
 import com.example.flashify.viewmodel.DeckViewModel
+import com.example.flashify.viewmodel.GenerationLimitState
 import com.example.flashify.viewmodel.QuizViewModel
 
 @Composable
@@ -42,45 +43,59 @@ fun TelaResultadoQuiz(
     val incorrectAnswers = totalQuestions - correctAnswers
 
     val addContentState by deckViewModel.addContentState.collectAsStateWithLifecycle()
-    val syncCompleted by deckViewModel.syncCompleted.collectAsStateWithLifecycle()
+    val generationLimitState by deckViewModel.generationLimitState.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) { viewModel.submitQuiz(quizId, score, correctAnswers, totalQuestions) }
+    // ✅ VERIFICAR LIMITE DE GERAÇÕES
+    val hasGenerationLimit = remember(generationLimitState) {
+        if (generationLimitState is GenerationLimitState.Success) {
+            val info = (generationLimitState as GenerationLimitState.Success).info
+            info.used >= info.limit
+        } else {
+            false
+        }
+    }
 
-    // ✅ MODIFICADO: Observa syncCompleted para redirecionamento automático
-    LaunchedEffect(addContentState, syncCompleted) {
-        when {
-            // ✅ Sucesso + Sincronização completa = REDIRECIONAMENTO AUTOMÁTICO
-            addContentState is AddContentState.Success && syncCompleted -> {
+    LaunchedEffect(Unit) {
+        viewModel.submitQuiz(quizId, score, correctAnswers, totalQuestions)
+    }
+
+    // ✅ CORRIGIDO: Fluxo de redirecionamento após sucesso
+    LaunchedEffect(addContentState) {
+        when (val state = addContentState) {
+            is AddContentState.Success -> {
                 Toast.makeText(
                     context,
-                    (addContentState as AddContentState.Success).message,
+                    state.message,
                     Toast.LENGTH_SHORT
                 ).show()
-                showAddDialog = false
-                deckViewModel.resetAddContentState()
 
-                // ✅ Delay mínimo e depois redireciona automaticamente
-                kotlinx.coroutines.delay(500)
-                onRetry()
+                // ✅ FECHA O DIÁLOGO IMEDIATAMENTE
+                showAddDialog = false
+
+                // ✅ AGUARDA 800MS E REDIRECIONA
+                kotlinx.coroutines.delay(800)
+                deckViewModel.resetAddContentState()
+                onRetry() // ✅ REDIRECIONA AUTOMATICAMENTE
             }
 
-            // ❌ Erro na adição de conteúdo
-            addContentState is AddContentState.Error -> {
+            is AddContentState.Error -> {
                 Toast.makeText(
                     context,
-                    (addContentState as AddContentState.Error).message,
+                    state.message,
                     Toast.LENGTH_LONG
                 ).show()
                 deckViewModel.resetAddContentState()
+                showAddDialog = false
             }
 
             else -> {}
         }
     }
 
+    // ✅ DIÁLOGO COM VERIFICAÇÃO DE LIMITE
     if (showAddDialog) {
         AddContentDialog(
             title = "Adicionar Perguntas",
@@ -89,9 +104,16 @@ fun TelaResultadoQuiz(
             currentCount = totalQuestions,
             maxLimit = 15,
             isLoading = addContentState is AddContentState.Loading,
-            onDismiss = { showAddDialog = false },
+            hasGenerationLimit = hasGenerationLimit,
+            onDismiss = {
+                showAddDialog = false
+                deckViewModel.resetAddContentState()
+            },
             onConfirm = { qtd, difficulty ->
-                deckViewModel.addQuestionsToQuiz(documentId, qtd, difficulty)
+                // ✅ DUPLA VERIFICAÇÃO antes de enviar
+                if (!hasGenerationLimit) {
+                    deckViewModel.addQuestionsToQuiz(documentId, qtd, difficulty)
+                }
             }
         )
     }
@@ -171,16 +193,27 @@ fun TelaResultadoQuiz(
                 if (totalQuestions < 15) {
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // ✅ MODIFICADO: Botão com estado de loading
                     OutlinedButton(
-                        onClick = { showAddDialog = true },
+                        onClick = {
+                            // ✅ VERIFICAR LIMITE ANTES DE ABRIR DIÁLOGO
+                            if (!hasGenerationLimit) {
+                                showAddDialog = true
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Limite diário de gerações atingido!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         border = BorderStroke(1.5.dp, Color(0xFF26C6DA)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF26C6DA)),
                         shape = RoundedCornerShape(16.dp),
-                        enabled = addContentState !is AddContentState.Loading
+                        // ✅ BOTÃO DESABILITADO se limite atingido OU se está carregando
+                        enabled = !hasGenerationLimit && addContentState !is AddContentState.Loading
                     ) {
                         if (addContentState is AddContentState.Loading) {
                             CircularProgressIndicator(
@@ -189,11 +222,15 @@ fun TelaResultadoQuiz(
                                 strokeWidth = 2.dp
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text("Gerando Perguntas...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Gerando...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         } else {
                             Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
-                            Text("Adicionar Perguntas", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (hasGenerationLimit) "Limite Atingido" else "Adicionar Perguntas",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

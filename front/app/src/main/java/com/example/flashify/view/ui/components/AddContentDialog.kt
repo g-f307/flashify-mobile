@@ -47,7 +47,9 @@ fun AddContentDialog(
     maxLimit: Int,
     isLoading: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (Int, String) -> Unit
+    onConfirm: (Int, String) -> Unit,
+    // ✅ NOVO: Parâmetro para verificar limite
+    hasGenerationLimit: Boolean = false
 ) {
     var quantity by remember { mutableStateOf(5) }
     var customQuantity by remember { mutableStateOf("") }
@@ -111,7 +113,11 @@ fun AddContentDialog(
 
     Dialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = !isLoading,
+            dismissOnClickOutside = !isLoading
+        )
     ) {
         Card(
             modifier = Modifier
@@ -215,6 +221,42 @@ fun AddContentDialog(
                             maxLimit = maxLimit,
                             contentType = contentType
                         )
+
+                        // ✅ NOVO: Aviso se limite atingido
+                        if (hasGenerationLimit) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFF44336).copy(alpha = 0.1f)
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    Color(0xFFF44336).copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF44336),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        "Limite diário de gerações atingido! Aguarde o reset para criar mais conteúdo.",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -243,12 +285,13 @@ fun AddContentDialog(
                             }
                             Button(
                                 onClick = { onConfirm(quantity, difficulty) },
-                                enabled = !isOverLimit,
+                                // ✅ DESABILITA se limite atingido OU over limit
+                                enabled = !isOverLimit && !hasGenerationLimit,
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(50.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = YellowAccent,
+                                    containerColor = if (hasGenerationLimit) Color.Gray else YellowAccent,
                                     contentColor = Color.Black
                                 ),
                                 shape = RoundedCornerShape(12.dp)
@@ -369,6 +412,7 @@ private fun ColumnScope.LoadingContent(progress: Float, message: String) {
     }
 }
 
+// StatusCard, QuantitySelector, DifficultySelector e SummaryCard permanecem iguais
 @Composable
 private fun StatusCard(currentCount: Int, maxLimit: Int, availableSlots: Int, contentType: String) {
     Card(
