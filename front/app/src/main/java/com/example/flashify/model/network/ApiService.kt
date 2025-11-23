@@ -20,7 +20,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 import java.util.concurrent.TimeUnit
 
-private const val BASE_URL = "http://10.100.33.138:9000/"
+private const val BASE_URL = "http://192.168.1.28:9000/"
 
 private val okHttpClient = OkHttpClient.Builder()
     .connectTimeout(120, TimeUnit.SECONDS) // 2 minutos para conectar
@@ -198,6 +198,25 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Path("id") documentId: Int
     ): Response<Unit>
+
+    @GET("documents/generation-limit")
+    suspend fun getGenerationLimit(
+        @Header("Authorization") token: String
+    ): com.example.flashify.model.data.GenerationLimitResponse
+
+    @POST("documents/{document_id}/add-flashcards")
+    suspend fun addMoreFlashcards(
+        @Header("Authorization") token: String,
+        @Path("document_id") documentId: Int,
+        @Body request: com.example.flashify.model.data.AddFlashcardsRequest
+    ): List<FlashcardResponse>
+
+    @POST("documents/{document_id}/add-questions")
+    suspend fun addMoreQuestions(
+        @Header("Authorization") token: String,
+        @Path("document_id") documentId: Int,
+        @Body request: com.example.flashify.model.data.AddQuestionsRequest
+    ): com.example.flashify.model.data.QuizResponse
 }
 
 object Api {

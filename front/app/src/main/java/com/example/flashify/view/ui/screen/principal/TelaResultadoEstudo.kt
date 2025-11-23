@@ -24,22 +24,19 @@ import com.example.flashify.view.ui.components.*
 import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.AddContentState
 import com.example.flashify.viewmodel.DeckViewModel
-import com.example.flashify.viewmodel.QuizViewModel
 
 @Composable
-fun TelaResultadoQuiz(
-    quizId: Int,
+fun TelaResultadoEstudo(
     documentId: Int,
-    totalQuestions: Int,
-    correctAnswers: Int,
-    onRetry: () -> Unit,
+    totalCards: Int,
+    knownCards: Int,
+    learningCards: Int,
+    onRestart: () -> Unit,
     onFinish: () -> Unit,
-    viewModel: QuizViewModel,
     deckViewModel: DeckViewModel
 ) {
-    val score = if (totalQuestions > 0) (correctAnswers.toFloat() / totalQuestions) * 100 else 0f
-    val accuracy = score / 100f
-    val incorrectAnswers = totalQuestions - correctAnswers
+    val accuracy = if (totalCards > 0) knownCards.toFloat() / totalCards else 0f
+    val score = accuracy * 100
 
     val addContentState by deckViewModel.addContentState.collectAsStateWithLifecycle()
     val syncCompleted by deckViewModel.syncCompleted.collectAsStateWithLifecycle()
@@ -47,9 +44,7 @@ fun TelaResultadoQuiz(
     var showAddDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) { viewModel.submitQuiz(quizId, score, correctAnswers, totalQuestions) }
-
-    // ✅ MODIFICADO: Observa syncCompleted para redirecionamento automático
+    // ✅ MODIFICADO: Observa sincCompleted para redirecionamento automático
     LaunchedEffect(addContentState, syncCompleted) {
         when {
             // ✅ Sucesso + Sincronização completa = REDIRECIONAMENTO AUTOMÁTICO
@@ -64,7 +59,7 @@ fun TelaResultadoQuiz(
 
                 // ✅ Delay mínimo e depois redireciona automaticamente
                 kotlinx.coroutines.delay(500)
-                onRetry()
+                onRestart()
             }
 
             // ❌ Erro na adição de conteúdo
@@ -83,15 +78,15 @@ fun TelaResultadoQuiz(
 
     if (showAddDialog) {
         AddContentDialog(
-            title = "Adicionar Perguntas",
-            description = "Amplie seu quiz com novas perguntas geradas pela IA",
-            contentType = "Perguntas",
-            currentCount = totalQuestions,
-            maxLimit = 15,
+            title = "Adicionar Flashcards",
+            description = "Expanda seu deck com novos flashcards gerados pela IA",
+            contentType = "Flashcards",
+            currentCount = totalCards,
+            maxLimit = 20,
             isLoading = addContentState is AddContentState.Loading,
             onDismiss = { showAddDialog = false },
             onConfirm = { qtd, difficulty ->
-                deckViewModel.addQuestionsToQuiz(documentId, qtd, difficulty)
+                deckViewModel.addFlashcardsToDeck(documentId, qtd, difficulty)
             }
         )
     }
@@ -116,9 +111,7 @@ fun TelaResultadoQuiz(
                 PerformanceCard {
                     CircularPerformanceChart(
                         percentage = accuracy,
-                        color = if (score >= 70) Color(0xFF4CAF50)
-                        else if (score >= 50) YellowAccent
-                        else Color(0xFFF44336)
+                        color = if (score >= 80) Color(0xFF4CAF50) else YellowAccent
                     )
 
                     Divider(
@@ -131,28 +124,28 @@ fun TelaResultadoQuiz(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        StatItem(Icons.Default.CheckCircle, "Corretas", "$correctAnswers", Color(0xFF4CAF50))
+                        StatItem(Icons.Default.School, "Dominados", "$knownCards", Color(0xFF4CAF50))
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
                                 .height(48.dp)
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                         )
-                        StatItem(Icons.Default.Cancel, "Incorretas", "$incorrectAnswers", Color(0xFFF44336))
+                        StatItem(Icons.Default.MenuBook, "A Revisar", "$learningCards", YellowAccent)
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
                                 .height(48.dp)
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                         )
-                        StatItem(Icons.Default.Help, "Total", "$totalQuestions", Color(0xFF2196F3))
+                        StatItem(Icons.Default.Layers, "Total", "$totalCards", Color(0xFF2196F3))
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = onRetry,
+                    onClick = onRestart,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -165,10 +158,10 @@ fun TelaResultadoQuiz(
                 ) {
                     Icon(Icons.Default.Refresh, null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("Tentar Novamente", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Reiniciar Deck", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
-                if (totalQuestions < 15) {
+                if (totalCards < 20) {
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // ✅ MODIFICADO: Botão com estado de loading
@@ -189,11 +182,11 @@ fun TelaResultadoQuiz(
                                 strokeWidth = 2.dp
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text("Gerando Perguntas...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Gerando Flashcards...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         } else {
                             Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
-                            Text("Adicionar Perguntas", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Adicionar Flashcards", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

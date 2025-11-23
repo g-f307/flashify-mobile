@@ -2,8 +2,11 @@
 from sqlmodel import Session, select, func, distinct
 from . import models, schemas, security
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import selectinload
+import random
+
+DAILY_GENERATION_LIMIT = 10
 
 def get_or_create_google_user(
     session: Session,
@@ -162,27 +165,6 @@ def get_flashcard(session: Session, flashcard_id: int, user_id: int) -> models.F
     )
     return session.exec(statement).first()
 
-def update_flashcard(db: Session, flashcard_id: int, front: str | None = None, back: str | None = None) -> models.Flashcard | None:
-    """
-    Atualiza o conteúdo de um flashcard (frente e/ou verso).
-    """
-    db_flashcard = db.get(models.Flashcard, flashcard_id)
-    
-    if not db_flashcard:
-        return None
-
-    # Atualiza apenas se os valores foram passados
-    if front is not None:
-        db_flashcard.front = front
-    if back is not None:
-        db_flashcard.back = back
-
-    db.add(db_flashcard)
-    db.commit()
-    db.refresh(db_flashcard)
-    
-    return db_flashcard
-
 def create_study_log(session: Session, user_id: int, flashcard_id: int, accuracy: float) -> models.StudyLog:
     db_study_log = models.StudyLog(
         user_id=user_id,
@@ -210,6 +192,27 @@ def get_studied_flashcards_count(session: Session, document_id: int) -> int:
     )
     count = session.exec(statement).one_or_none()
     return count or 0
+
+def update_flashcard(db: Session, flashcard_id: int, front: str | None = None, back: str | None = None) -> models.Flashcard | None:
+    """
+    Atualiza o conteúdo de um flashcard (frente e/ou verso).
+    """
+    db_flashcard = db.get(models.Flashcard, flashcard_id)
+    
+    if not db_flashcard:
+        return None
+
+    # Atualiza apenas se os valores foram passados
+    if front is not None:
+        db_flashcard.front = front
+    if back is not None:
+        db_flashcard.back = back
+
+    db.add(db_flashcard)
+    db.commit()
+    db.refresh(db_flashcard)
+    
+    return db_flashcard
 
 def delete_document_and_related_data(db: Session, document_id: int) -> bool:
     """
@@ -354,3 +357,124 @@ def get_quiz_attempts_for_user(session: Session, user_id: int) -> list[models.Qu
         .order_by(models.QuizAttempt.completed_at.desc())
     )
     return session.exec(statement).all()
+
+def check_and_reset_daily_limit(session: Session, user: models.User) -> None:
+    """
+    Verifica se precisa resetar o contador diário do usuário.
+    Reseta se passou mais de 24h desde o último reset.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Se nunca foi resetado, inicializa
+    if user.last_generation_reset is None:
+        user.last_generation_reset = now
+        user.daily_generation_count = 0
+        session.add(user)
+        session.commit()
+        return
+    
+    # Verifica se passou 24h
+    time_since_reset = now - user.last_generation_reset
+    if time_since_reset >= timedelta(hours=24):
+        user.last_generation_reset = now
+        user.daily_generation_count = 0
+        session.add(user)
+        session.commit()
+
+def can_user_generate_deck(session: Session, user: models.User) -> tuple[bool, int]:
+    """
+    Verifica se o usuário pode gerar um novo deck.
+    Retorna (pode_gerar, gerações_restantes)
+    """
+    # Primeiro, verifica e reseta se necessário
+    check_and_reset_daily_limit(session, user)
+    
+    # Atualiza o usuário após possível reset
+    session.refresh(user)
+    
+    can_generate = user.daily_generation_count < DAILY_GENERATION_LIMIT
+    remaining = max(0, DAILY_GENERATION_LIMIT - user.daily_generation_count)
+    
+    return can_generate, remaining
+
+def increment_user_generation_count(session: Session, user_id: int) -> None:
+    """
+    Incrementa o contador de gerações do usuário.
+    Deve ser chamado APENAS quando a geração for bem-sucedida.
+    """
+    user = session.get(models.User, user_id)
+    if user:
+        user.daily_generation_count += 1
+        session.add(user)
+        session.commit()
+
+def get_user_generation_info(session: Session, user: models.User) -> dict:
+    """
+    Retorna informações sobre o limite de gerações do usuário.
+    """
+    check_and_reset_daily_limit(session, user)
+    session.refresh(user)
+    
+    remaining = max(0, DAILY_GENERATION_LIMIT - user.daily_generation_count)
+    
+    # Calcula quanto tempo falta para o reset
+    if user.last_generation_reset:
+        next_reset = user.last_generation_reset + timedelta(hours=24)
+        time_until_reset = next_reset - datetime.now(timezone.utc)
+        hours_until_reset = int(time_until_reset.total_seconds() / 3600)
+    else:
+        hours_until_reset = 24
+    
+    return {
+        "used": user.daily_generation_count,
+        "remaining": remaining,
+        "limit": DAILY_GENERATION_LIMIT,
+        "hours_until_reset": hours_until_reset
+    }
+
+def shuffle_quiz_answers(quiz_data: dict) -> dict:
+    """
+    Embaralha as alternativas de cada pergunta do quiz para evitar padrões previsíveis.
+    Mantém a estrutura do quiz intacta.
+    """
+    shuffled_quiz = quiz_data.copy()
+    
+    for question in shuffled_quiz.get("questions", []):
+        if "answers" in question and isinstance(question["answers"], list):
+            # Embaralha as alternativas
+            random.shuffle(question["answers"])
+    
+    return shuffled_quiz
+
+def create_quiz_for_document(db: Session, quiz_data: schemas.QuizCreate, document_id: int) -> models.Quiz:
+    """
+    Cria um novo quiz completo, com todas as suas perguntas e respostas,
+    e associa-o a um documento existente.
+    
+    🆕 AGORA COM EMBARALHAMENTO DE ALTERNATIVAS
+    """
+    questions_to_create = []
+    for question_schema in quiz_data.questions:
+        # 🆕 Embaralha as alternativas antes de criar
+        shuffled_answers = question_schema.answers.copy()
+        random.shuffle(shuffled_answers)
+        
+        answers_to_create = [
+            models.Answer(**ans.dict()) for ans in shuffled_answers
+        ]
+        question_obj = models.Question(
+            text=question_schema.text, answers=answers_to_create
+        )
+        questions_to_create.append(question_obj)
+
+    db_quiz = models.Quiz(
+        title=quiz_data.title,
+        document_id=document_id,
+        questions=questions_to_create
+    )
+    
+    db.add(db_quiz)
+    db.commit()
+    db.refresh(db_quiz)
+    
+    return db_quiz

@@ -14,6 +14,7 @@ activityCompose = "1.10.1"
 composeBom = "2024.09.00"
 lifecycleRuntimeKtxVersion = "2.8.1"
 foundation = "1.9.4"
+foundationVersion = "1.9.5"
 
 [libraries]
 androidx-activity-compose-v190 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
@@ -43,6 +44,7 @@ androidx-compose-foundation = { group = "androidx.compose.foundation", name = "f
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version = "1.2.0" }
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundationVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

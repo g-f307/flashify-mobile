@@ -62,6 +62,20 @@ sealed class DeckStatsState {
     data class Error(val message: String) : DeckStatsState()
 }
 
+sealed class GenerationLimitState {
+    object Idle : GenerationLimitState()
+    object Loading : GenerationLimitState()
+    data class Success(val info: com.example.flashify.model.data.GenerationLimitResponse) : GenerationLimitState()
+    data class Error(val message: String) : GenerationLimitState()
+}
+
+sealed class AddContentState {
+    object Idle : AddContentState()
+    object Loading : AddContentState()
+    data class Success(val message: String) : AddContentState()
+    data class Error(val message: String) : AddContentState()
+}
+
 @HiltViewModel
 class DeckViewModel @Inject constructor(
     private val tokenManager: TokenManager,
@@ -85,6 +99,16 @@ class DeckViewModel @Inject constructor(
 
     private val _deckStatsState = MutableStateFlow<DeckStatsState>(DeckStatsState.Idle)
     val deckStatsState = _deckStatsState.asStateFlow()
+
+    private val _generationLimitState = MutableStateFlow<GenerationLimitState>(GenerationLimitState.Idle)
+    val generationLimitState = _generationLimitState.asStateFlow()
+
+    private val _addContentState = MutableStateFlow<AddContentState>(AddContentState.Idle)
+    val addContentState = _addContentState.asStateFlow()
+
+    // ✅ NOVO: StateFlow para sincronização de dados
+    private val _syncCompleted = MutableStateFlow(false)
+    val syncCompleted = _syncCompleted.asStateFlow()
 
     private var pollingJob: kotlinx.coroutines.Job? = null
 
@@ -165,6 +189,113 @@ class DeckViewModel @Inject constructor(
         }
     }
 
+    fun checkGenerationLimit() {
+        viewModelScope.launch {
+            _generationLimitState.value = GenerationLimitState.Loading
+            val token = tokenManager.getToken()
+            if (token == null) {
+                _generationLimitState.value = GenerationLimitState.Error("Sessão inválida")
+                return@launch
+            }
+
+            try {
+                val limitInfo = apiService.getGenerationLimit(token)
+                _generationLimitState.value = GenerationLimitState.Success(limitInfo)
+            } catch (e: Exception) {
+                _generationLimitState.value = GenerationLimitState.Error(e.message ?: "Erro ao verificar limite")
+            }
+        }
+    }
+
+    // ✅ FUNÇÃO MODIFICADA: Adicionar Flashcards com sincronização
+    fun addFlashcardsToDeck(documentId: Int, quantity: Int, difficulty: String) {
+        viewModelScope.launch {
+            _addContentState.value = AddContentState.Loading
+            _syncCompleted.value = false
+
+            val token = tokenManager.getToken()
+            if (token == null) {
+                _addContentState.value = AddContentState.Error("Sessão expirada")
+                return@launch
+            }
+
+            try {
+                val request = com.example.flashify.model.data.AddFlashcardsRequest(numFlashcards = quantity)
+                apiService.addMoreFlashcards(token, documentId, request)
+
+                // ✅ Inicia fetch dos dados atualizados
+                launch {
+                    try {
+                        fetchDecks(showLoading = false)
+                        fetchDeckStats(documentId, showLoading = false)
+                        checkGenerationLimit()
+
+                        // ✅ Aguarda 1.5 segundos para garantir sincronização
+                        kotlinx.coroutines.delay(1500)
+                        _syncCompleted.value = true
+
+                        Log.d("DeckViewModel", "✅ Sincronização completa")
+                    } catch (e: Exception) {
+                        Log.e("DeckViewModel", "❌ Erro na sincronização: ${e.message}")
+                        _syncCompleted.value = true // Mesmo com erro, permite prosseguir
+                    }
+                }
+
+                _addContentState.value = AddContentState.Success("Novos flashcards adicionados com sucesso!")
+
+            } catch (e: Exception) {
+                _addContentState.value = AddContentState.Error(handleError(e, "Erro ao adicionar flashcards"))
+            }
+        }
+    }
+
+    // ✅ FUNÇÃO MODIFICADA: Adicionar Perguntas com sincronização
+    fun addQuestionsToQuiz(documentId: Int, quantity: Int, difficulty: String) {
+        viewModelScope.launch {
+            _addContentState.value = AddContentState.Loading
+            _syncCompleted.value = false
+
+            val token = tokenManager.getToken()
+            if (token == null) {
+                _addContentState.value = AddContentState.Error("Sessão expirada")
+                return@launch
+            }
+
+            try {
+                val request = com.example.flashify.model.data.AddQuestionsRequest(numQuestions = quantity)
+                apiService.addMoreQuestions(token, documentId, request)
+
+                // ✅ Inicia fetch dos dados atualizados
+                launch {
+                    try {
+                        fetchDecks(showLoading = false)
+                        fetchDeckStats(documentId, showLoading = false)
+                        checkGenerationLimit()
+
+                        // ✅ Aguarda 1.5 segundos para garantir sincronização
+                        kotlinx.coroutines.delay(1500)
+                        _syncCompleted.value = true
+
+                        Log.d("DeckViewModel", "✅ Sincronização completa")
+                    } catch (e: Exception) {
+                        Log.e("DeckViewModel", "❌ Erro na sincronização: ${e.message}")
+                        _syncCompleted.value = true // Mesmo com erro, permite prosseguir
+                    }
+                }
+
+                _addContentState.value = AddContentState.Success("Novas perguntas adicionadas com sucesso!")
+
+            } catch (e: Exception) {
+                _addContentState.value = AddContentState.Error(handleError(e, "Erro ao adicionar perguntas"))
+            }
+        }
+    }
+
+    fun resetAddContentState() {
+        _addContentState.value = AddContentState.Idle
+        _syncCompleted.value = false
+    }
+
     fun resetStatsState() {
         _deckStatsState.value = DeckStatsState.Idle
     }
@@ -200,8 +331,10 @@ class DeckViewModel @Inject constructor(
                 val response = apiService.createDeckFromText(token, request)
                 _deckCreationState.value = DeckCreationState.Success(response)
                 fetchDecks()
+                checkGenerationLimit()
             } catch (e: Exception) {
-                _deckCreationState.value = DeckCreationState.Error("Erro ao criar deck: ${e.message}")
+                val errorMessage = handleError(e, "Erro ao criar deck")
+                _deckCreationState.value = DeckCreationState.Error(errorMessage)
             }
         }
     }
@@ -264,9 +397,11 @@ class DeckViewModel @Inject constructor(
                 )
 
                 _deckCreationState.value = DeckCreationState.Success(response)
+                checkGenerationLimit()
 
             } catch (e: Exception) {
-                _deckCreationState.value = DeckCreationState.Error("Erro ao enviar arquivo: ${e.message}")
+                val errorMessage = handleError(e, "Erro ao enviar arquivo")
+                _deckCreationState.value = DeckCreationState.Error(errorMessage)
                 e.printStackTrace()
             }
         }
@@ -386,11 +521,11 @@ class DeckViewModel @Inject constructor(
 
                 fetchDecks()
                 fetchDeckStats(documentId)
+                checkGenerationLimit()
 
             } catch (e: Exception) {
-                _deckActionState.value = DeckActionState.Error(
-                    e.message ?: "Erro ao gerar flashcards"
-                )
+                val errorMessage = handleError(e, "Erro ao gerar flashcards")
+                _deckActionState.value = DeckActionState.Error(errorMessage)
             }
         }
     }
@@ -411,11 +546,11 @@ class DeckViewModel @Inject constructor(
 
                 fetchDecks()
                 fetchDeckStats(documentId)
+                checkGenerationLimit()
 
             } catch (e: Exception) {
-                _deckActionState.value = DeckActionState.Error(
-                    e.message ?: "Erro ao gerar quiz"
-                )
+                val errorMessage = handleError(e, "Erro ao gerar quiz")
+                _deckActionState.value = DeckActionState.Error(errorMessage)
             }
         }
     }
@@ -486,9 +621,47 @@ class DeckViewModel @Inject constructor(
         }
     }
 
+    fun reloadDeck(documentId: Int) {
+        viewModelScope.launch {
+            try {
+                Log.d("DeckViewModel", "📄 Recarregando deck $documentId...")
+
+                fetchDecks(showLoading = false)
+                fetchDeckStats(documentId, showLoading = false)
+
+                Log.d("DeckViewModel", "✅ Deck $documentId recarregado com sucesso")
+            } catch (e: Exception) {
+                Log.e("DeckViewModel", "❌ Erro ao recarregar deck: ${e.message}")
+            }
+        }
+    }
+
+    fun reloadQuiz(documentId: Int) {
+        viewModelScope.launch {
+            try {
+                Log.d("DeckViewModel", "📄 Recarregando quiz $documentId...")
+
+                fetchDecks(showLoading = false)
+                fetchDeckStats(documentId, showLoading = false)
+
+                Log.d("DeckViewModel", "✅ Quiz $documentId recarregado com sucesso")
+            } catch (e: Exception) {
+                Log.e("DeckViewModel", "❌ Erro ao recarregar quiz: ${e.message}")
+            }
+        }
+    }
+
     fun stopDocumentPolling() {
         pollingJob?.cancel()
         pollingJob = null
         _documentProcessingState.value = DocumentProcessingState.Idle
+    }
+
+    private fun handleError(e: Exception, defaultMessage: String): String {
+        return if (e is retrofit2.HttpException && e.code() == 429) {
+            "Limite diário de gerações atingido! Tente novamente mais tarde."
+        } else {
+            "${defaultMessage}: ${e.message ?: "Erro desconhecido"}"
+        }
     }
 }

@@ -15,11 +15,20 @@ from ..tasks import process_document
 from ..ai_generator import generate_flashcards_from_text, generate_quiz_from_text
 from pydantic import BaseModel, Field
 
+
 router = APIRouter(prefix="/documents", tags=["Documents"])
 CurrentUser = Annotated[models.User, Depends(security.get_current_user)]
 
 UPLOAD_DIRECTORY = Path("uploads")
 UPLOAD_DIRECTORY.mkdir(exist_ok=True)
+
+class AddFlashcardsRequest(BaseModel):
+    num_flashcards: int = Field(ge=1, le=20)
+    difficulty: str = "Médio"
+
+class AddQuestionsRequest(BaseModel):
+    num_questions: int = Field(ge=1, le=15)
+    difficulty: str = "Médio"
 
 class TextInput(BaseModel):
     text: str
@@ -52,6 +61,21 @@ def upload_document(
     difficulty: str = Form("Médio"),
     num_questions: int = Form(5),
 ):
+    # 🆕 VERIFICAR LIMITE ANTES DE PROCESSAR
+    can_generate, remaining = crud.can_user_generate_deck(session, current_user)
+    
+    if not can_generate:
+        generation_info = crud.get_user_generation_info(session, current_user)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": "Limite diário de gerações atingido",
+                "limit": generation_info["limit"],
+                "used": generation_info["used"],
+                "hours_until_reset": generation_info["hours_until_reset"]
+            }
+        )
+    
     if not file.content_type in ["image/jpeg", "image/png", "application/pdf"]:
         raise HTTPException(status_code=400, detail="Tipo de arquivo inválido.")
 
@@ -89,6 +113,21 @@ def create_document_from_text(
     current_user: CurrentUser,
     session: Session = Depends(get_session)
 ):
+    # 🆕 VERIFICAR LIMITE ANTES DE PROCESSAR
+    can_generate, remaining = crud.can_user_generate_deck(session, current_user)
+    
+    if not can_generate:
+        generation_info = crud.get_user_generation_info(session, current_user)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": "Limite diário de gerações atingido",
+                "limit": generation_info["limit"],
+                "used": generation_info["used"],
+                "hours_until_reset": generation_info["hours_until_reset"]
+            }
+        )
+    
     if not text_input.text.strip():
         raise HTTPException(status_code=400, detail="Texto não pode estar vazio")
     
@@ -115,6 +154,17 @@ def create_document_from_text(
     )
     
     return db_document
+
+# 🆕 NOVO ENDPOINT PARA VERIFICAR STATUS DO LIMITE
+@router.get("/generation-limit", response_model=dict)
+def get_generation_limit_status(
+    current_user: CurrentUser,
+    session: Session = Depends(get_session),
+):
+    """
+    Retorna informações sobre o limite de gerações do usuário.
+    """
+    return crud.get_user_generation_info(session, current_user)
 
 @router.get("/", response_model=list[schemas.DocumentCardData])
 def get_user_documents(
@@ -251,6 +301,11 @@ def generate_quiz_for_existing_document(
     current_user: CurrentUser,
     session: Session = Depends(get_session),
 ):
+    """
+    Gera um quiz para um documento existente, com alternativas embaralhadas.
+    """
+    # Verificações de limite omitidas para brevidade...
+    
     db_document = crud.get_document(session, document_id)
     if not db_document or db_document.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Documento não encontrado")
@@ -273,10 +328,16 @@ def generate_quiz_for_existing_document(
     if not quiz_data_dict:
         raise HTTPException(status_code=500, detail="A IA não conseguiu gerar o quiz.")
 
+    # 🆕 EMBARALHAR AS ALTERNATIVAS ANTES DE CRIAR O QUIZ
+    quiz_data_dict = crud.shuffle_quiz_answers(quiz_data_dict)
+
     quiz_schema = schemas.QuizCreate(**quiz_data_dict)
     db_quiz = crud.create_quiz_for_document(
         db=session, quiz_data=quiz_schema, document_id=document_id
     )
+    
+    crud.increment_user_generation_count(session, current_user.id)
+    
     return db_quiz
 
 @router.post("/{document_id}/generate-flashcards", response_model=List[models.Flashcard], status_code=status.HTTP_201_CREATED)
@@ -285,6 +346,21 @@ def generate_flashcards_for_existing_document(
     current_user: CurrentUser,
     session: Session = Depends(get_session),
 ):
+    # 🆕 VERIFICAR LIMITE ANTES DE GERAR
+    can_generate, remaining = crud.can_user_generate_deck(session, current_user)
+    
+    if not can_generate:
+        generation_info = crud.get_user_generation_info(session, current_user)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": "Limite diário de gerações atingido",
+                "limit": generation_info["limit"],
+                "used": generation_info["used"],
+                "hours_until_reset": generation_info["hours_until_reset"]
+            }
+        )
+    
     db_document = crud.get_document(session, document_id)
     if not db_document or db_document.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Documento não encontrado")
@@ -312,4 +388,193 @@ def generate_flashcards_for_existing_document(
         flashcards_data=flashcards_data,
         document_id=document_id
     )
+    
+    # 🆕 INCREMENTAR CONTADOR APÓS SUCESSO
+    crud.increment_user_generation_count(session, current_user.id)
+    
     return db_flashcards
+
+@router.post("/{document_id}/add-flashcards", response_model=List[models.Flashcard], status_code=status.HTTP_201_CREATED)
+def add_more_flashcards(
+    document_id: int,
+    request: AddFlashcardsRequest,
+    current_user: CurrentUser,
+    session: Session = Depends(get_session),
+):
+    # 🆕 VERIFICAR LIMITE ANTES DE ADICIONAR
+    can_generate, remaining = crud.can_user_generate_deck(session, current_user)
+    
+    if not can_generate:
+        generation_info = crud.get_user_generation_info(session, current_user)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": "Limite diário de gerações atingido",
+                "limit": generation_info["limit"],
+                "used": generation_info["used"],
+                "hours_until_reset": generation_info["hours_until_reset"]
+            }
+        )
+    
+    db_document = crud.get_document(session, document_id)
+    if not db_document or db_document.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+        
+    if not db_document.extracted_text:
+        raise HTTPException(status_code=400, detail="Documento não tem texto para gerar flashcards.")
+    
+    # Resto do código permanece igual...
+    current_count = len(db_document.flashcards)
+    max_flashcards = 20
+    
+    if current_count >= max_flashcards:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Este deck já atingiu o limite máximo de {max_flashcards} flashcards."
+        )
+    
+    requested_count = request.num_flashcards
+    available_slots = max_flashcards - current_count
+    
+    if requested_count > available_slots:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Você pode adicionar no máximo {available_slots} flashcards. Atualmente existem {current_count} de {max_flashcards}."
+        )
+
+    existing_flashcards_text = [
+        f"Pergunta: {fc.front}\nResposta: {fc.back}" 
+        for fc in db_document.flashcards
+    ]
+    existing_content = "\n\n---\n\n".join(existing_flashcards_text)
+
+    enhanced_text = f"""
+IMPORTANTE: Você já gerou os seguintes flashcards para este conteúdo. NÃO REPITA NENHUM DELES:
+
+{existing_content}
+
+---
+
+Agora, com base no MESMO CONTEÚDO ORIGINAL abaixo, gere {requested_count} NOVOS flashcards INÉDITOS que NÃO tenham sido abordados nos flashcards acima:
+
+{db_document.extracted_text}
+"""
+
+    try:
+        new_flashcards_data = generate_flashcards_from_text(
+            text=enhanced_text,
+            num_flashcards=requested_count,
+            difficulty=request.difficulty
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar novos flashcards: {str(e)}")
+
+    if not new_flashcards_data:
+        raise HTTPException(status_code=500, detail="A IA não conseguiu gerar novos flashcards.")
+
+    db_flashcards = crud.create_flashcards_for_document(
+        session=session,
+        flashcards_data=new_flashcards_data,
+        document_id=document_id
+    )
+    
+    # 🆕 INCREMENTAR CONTADOR APÓS SUCESSO
+    crud.increment_user_generation_count(session, current_user.id)
+    
+    return db_flashcards
+
+
+@router.post("/{document_id}/add-questions", response_model=schemas.Quiz, status_code=status.HTTP_201_CREATED)
+def add_more_questions(
+    document_id: int,
+    request: AddQuestionsRequest,
+    current_user: CurrentUser,
+    session: Session = Depends(get_session),
+):
+    """
+    Adiciona mais perguntas a um quiz existente, com alternativas embaralhadas.
+    """
+    # Verificações de limite omitidas para brevidade...
+    
+    db_document = crud.get_document(session, document_id)
+    if not db_document or db_document.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+        
+    if not db_document.extracted_text:
+        raise HTTPException(status_code=400, detail="Documento não tem texto para gerar quiz.")
+    
+    if not db_document.quiz:
+        raise HTTPException(status_code=400, detail="Este documento não possui um quiz. Crie um primeiro.")
+    
+    current_count = len(db_document.quiz.questions)
+    max_questions = 15
+    
+    if current_count >= max_questions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Este quiz já atingiu o limite máximo de {max_questions} perguntas."
+        )
+    
+    requested_count = request.num_questions
+    available_slots = max_questions - current_count
+    
+    if requested_count > available_slots:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Você pode adicionar no máximo {available_slots} perguntas. Atualmente existem {current_count} de {max_questions}."
+        )
+
+    # Monta contexto com perguntas existentes
+    existing_questions_text = []
+    for question in db_document.quiz.questions:
+        answers_text = "\n".join([f"  - {ans.text}" for ans in question.answers])
+        existing_questions_text.append(
+            f"Pergunta: {question.text}\nAlternativas:\n{answers_text}"
+        )
+    
+    existing_content = "\n\n---\n\n".join(existing_questions_text)
+
+    enhanced_text = f"""
+IMPORTANTE: Você já gerou as seguintes perguntas para este conteúdo. NÃO REPITA NENHUMA DELAS:
+
+{existing_content}
+
+---
+
+Agora, com base no MESMO CONTEÚDO ORIGINAL abaixo, gere {requested_count} NOVAS perguntas INÉDITAS que NÃO tenham sido abordadas no quiz acima:
+
+{db_document.extracted_text}
+"""
+
+    try:
+        new_quiz_data = generate_quiz_from_text(
+            text=enhanced_text,
+            num_questions=requested_count,
+            difficulty=request.difficulty
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar novas perguntas: {str(e)}")
+
+    if not new_quiz_data or 'questions' not in new_quiz_data:
+        raise HTTPException(status_code=500, detail="A IA não conseguiu gerar novas perguntas.")
+
+    # 🆕 EMBARALHAR AS ALTERNATIVAS DAS NOVAS PERGUNTAS
+    new_quiz_data = crud.shuffle_quiz_answers(new_quiz_data)
+
+    for question_data in new_quiz_data['questions']:
+        answers_to_create = [
+            models.Answer(**ans) for ans in question_data['answers']
+        ]
+        question_obj = models.Question(
+            text=question_data['text'],
+            answers=answers_to_create,
+            quiz_id=db_document.quiz.id
+        )
+        session.add(question_obj)
+    
+    session.commit()
+    session.refresh(db_document.quiz)
+    
+    crud.increment_user_generation_count(session, current_user.id)
+    
+    return db_document.quiz

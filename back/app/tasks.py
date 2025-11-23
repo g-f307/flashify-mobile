@@ -2,12 +2,15 @@
 
 import traceback
 from pathlib import Path
-from sqlmodel import Session
+from sqlmodel import Session, select  # ✅ ADICIONAR select aqui
 from .worker import celery_app
 from .database import engine
 from . import crud, models, schemas
 from .text_extractor import extract_text_from_pdf, extract_text_from_image
 from .ai_generator import generate_flashcards_from_text, generate_quiz_from_text
+from .email_service import email_service
+from datetime import datetime, timedelta, timezone
+import asyncio
 
 @celery_app.task(
     bind=True,
@@ -36,7 +39,7 @@ def process_document(
             return
 
         try:
-            # --- PASSO 1: EXTRAÇÃO DE TEXTO (AGORA CONDICIONAL) ---
+            # --- PASSO 1: EXTRAÇÃO DE TEXTO ---
             db_document.current_step = "iniciando processamento"
             session.add(db_document)
             session.commit()
@@ -44,7 +47,6 @@ def process_document(
 
             extracted_text = db_document.extracted_text
 
-            # Só extrai de um ficheiro se o texto ainda não existir no documento
             if not extracted_text:
                 db_document.current_step = "extraindo texto"
                 session.add(db_document)
@@ -101,6 +103,10 @@ def process_document(
                     text=extracted_text, num_questions=num_questions, difficulty=difficulty
                 )
                 
+                # 🆕 EMBARALHAR AS ALTERNATIVAS ANTES DE SALVAR
+                if quiz_data_dict:
+                    quiz_data_dict = crud.shuffle_quiz_answers(quiz_data_dict)
+                
                 db_document.current_step = "parsing quiz"
                 session.add(db_document)
                 session.commit()
@@ -134,8 +140,13 @@ def process_document(
             db_document.processing_progress = 100
             session.add(db_document)
             session.commit()
+            
+            # 🆕 INCREMENTAR CONTADOR APENAS QUANDO GERAÇÃO FOR BEM-SUCEDIDA
+            crud.increment_user_generation_count(session, db_document.user_id)
+            
             print(f"[TASK] Doc {document_id} - Passo: {db_document.current_step}")
             print(f"[TASK] Documento {document_id} processado com sucesso.")
+            print(f"[TASK] ✅ Contador de gerações incrementado para usuário {db_document.user_id}")
 
         except Exception as e:
             session.rollback()
@@ -152,3 +163,113 @@ def process_document(
             session.add(db_document)
             session.commit()
             raise e
+        
+# 🆕 NOVA TASK: Enviar e-mails de inatividade
+@celery_app.task(name="send_inactivity_emails")
+def send_inactivity_emails():
+    """
+    Tarefa agendada: Envia e-mails para usuários inativos há mais de 2 dias
+    Executa diariamente às 10h
+    """
+    print("🔍 Verificando usuários inativos...")
+    
+    with Session(engine) as session:
+        # Data limite: 2 dias atrás
+        two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
+        
+        # Buscar usuários inativos que ainda não receberam e-mail
+        statement = select(models.User).where(
+            models.User.last_login_at < two_days_ago,
+            models.User.inactivity_email_sent == False,
+            models.User.is_active == True
+        )
+        
+        inactive_users = session.exec(statement).all()
+        
+        print(f"📧 Encontrados {len(inactive_users)} usuários inativos")
+        
+        for user in inactive_users:
+            try:
+                days_inactive = (datetime.now(timezone.utc) - user.last_login_at).days
+                
+                # Enviar e-mail (usando asyncio)
+                asyncio.run(
+                    email_service.send_inactivity_reminder(
+                        email=user.email,
+                        username=user.username,
+                        days_inactive=days_inactive
+                    )
+                )
+                
+                # Marcar como enviado
+                user.inactivity_email_sent = True
+                session.add(user)
+                session.commit()
+                
+            except Exception as e:
+                print(f"❌ Erro ao processar usuário {user.email}: {e}")
+                session.rollback()
+                continue
+        
+        print(f"✅ Processo de e-mails de inatividade concluído")
+
+# 🆕 NOVA TASK: Enviar e-mails de decks incompletos
+@celery_app.task(name="send_incomplete_deck_emails")
+def send_incomplete_deck_emails():
+    """
+    Tarefa agendada: Envia e-mails para decks em processamento há mais de 1 hora
+    ou que falharam há menos de 24 horas
+    Executa a cada 6 horas
+    """
+    print("🔍 Verificando decks incompletos...")
+    
+    with Session(engine) as session:
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+        one_day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+        
+        # Buscar documentos problemáticos que ainda não enviaram e-mail
+        statement = (
+            select(models.Document)
+            .join(models.User)
+            .where(
+                (
+                    (models.Document.status == models.DocumentStatus.PROCESSING) &
+                    (models.Document.created_at < one_hour_ago)
+                ) | (
+                    (models.Document.status == models.DocumentStatus.FAILED) &
+                    (models.Document.created_at > one_day_ago)
+                )
+            )
+        )
+        
+        problematic_docs = session.exec(statement).all()
+        
+        print(f"📧 Encontrados {len(problematic_docs)} decks incompletos")
+        
+        # Rastrear e-mails já enviados nesta execução (para evitar spam)
+        emails_sent = set()
+        
+        for doc in problematic_docs:
+            try:
+                user = doc.user
+                
+                # Evitar múltiplos e-mails para o mesmo usuário
+                if user.email in emails_sent:
+                    continue
+                
+                asyncio.run(
+                    email_service.send_incomplete_deck_reminder(
+                        email=user.email,
+                        username=user.username,
+                        document_title=doc.file_path,
+                        document_id=doc.id
+                    )
+                )
+                
+                emails_sent.add(user.email)
+                
+            except Exception as e:
+                print(f"❌ Erro ao processar documento {doc.id}: {e}")
+                continue
+        
+        print(f"✅ Processo de e-mails de decks incompletos concluído")

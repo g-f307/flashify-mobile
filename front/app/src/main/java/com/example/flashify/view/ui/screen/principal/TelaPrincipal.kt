@@ -1,7 +1,6 @@
 package com.example.flashify.view.ui.screen.principal
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +20,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,11 +40,12 @@ import kotlinx.coroutines.launch
 @Composable
 fun TelaPrincipal(
     navController: NavController,
-    deckViewModel: DeckViewModel = hiltViewModel(), // ✅ ATUALIZADO
-    homeViewModel: HomeViewModel = hiltViewModel()  // ✅ ATUALIZADO
+    deckViewModel: DeckViewModel = hiltViewModel(),
+    homeViewModel: HomeViewModel = hiltViewModel()
 ) {
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsState()
+    val generationLimitState by deckViewModel.generationLimitState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -52,6 +53,7 @@ fun TelaPrincipal(
             if (event == Lifecycle.Event.ON_RESUME) {
                 homeViewModel.refresh()
                 deckViewModel.fetchDecks()
+                deckViewModel.checkGenerationLimit()
             }
         }
 
@@ -60,6 +62,10 @@ fun TelaPrincipal(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
+    }
+
+    LaunchedEffect(Unit) {
+        deckViewModel.checkGenerationLimit()
     }
 
     var selectedItem by remember { mutableStateOf(0) }
@@ -114,7 +120,12 @@ fun TelaPrincipal(
                     .verticalScroll(rememberScrollState())
             ) {
                 Spacer(Modifier.height(16.dp))
-                CabecalhoUsuario(homeViewModel)
+
+                CabecalhoUsuario(
+                    homeViewModel = homeViewModel,
+                    generationLimitState = generationLimitState
+                )
+
                 Spacer(Modifier.height(24.dp))
                 SecaoStreak(state = homeState)
                 Spacer(Modifier.height(24.dp))
@@ -145,7 +156,8 @@ fun TelaPrincipal(
 @Composable
 fun CabecalhoUsuario(
     homeViewModel: HomeViewModel,
-    settingsViewModel: SettingsViewModel = hiltViewModel() // ✅ ATUALIZADO
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
+    generationLimitState: GenerationLimitState
 ) {
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
@@ -153,86 +165,113 @@ fun CabecalhoUsuario(
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+    // Transformamos o Row principal numa Column para acomodar o status em baixo
+    Column(
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(YellowAccent.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
+        // --- LINHA SUPERIOR: Avatar, Nome, Tema ---
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Avatar e Nome
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
             ) {
-                when (val state = userState) {
-                    is UserState.Success -> {
-                        Text(
-                            state.user.username.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
-                            fontWeight = FontWeight.Bold,
-                            color = YellowAccent,
-                            fontSize = 18.sp
-                        )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(YellowAccent.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val initial = when (val state = userState) {
+                        is UserState.Success -> state.user.username.firstOrNull()?.uppercaseChar()?.toString()
+                        else -> "U"
                     }
-                    else -> {
-                        Text(
-                            "U",
-                            fontWeight = FontWeight.Bold,
-                            color = YellowAccent,
-                            fontSize = 18.sp
-                        )
+                    Text(
+                        text = initial ?: "U",
+                        fontWeight = FontWeight.Bold,
+                        color = YellowAccent,
+                        fontSize = 18.sp
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Olá,",
+                        fontSize = 14.sp,
+                        color = TextSecondary
+                    )
+                    val username = when (val state = userState) {
+                        is UserState.Loading -> "Carregando..."
+                        is UserState.Success -> state.user.username
+                        is UserState.Error -> "Usuário"
+                        else -> ""
                     }
+                    Text(
+                        text = username,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    "Olá,",
-                    fontSize = 14.sp,
-                    color = TextSecondary
-                )
-                when (val state = userState) {
-                    is UserState.Loading -> {
-                        Text(
-                            "Carregando...",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                    is UserState.Success -> {
-                        Text(
-                            state.user.username,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                    is UserState.Error -> {
-                        Text(
-                            "Usuário",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
+
+            // Botão de Tema (Lado direito fixo)
+            IconButton(
+                onClick = {
+                    scope.launch {
+                        themeManager.toggleTheme()
                     }
                 }
+            ) {
+                Icon(
+                    imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
+                    contentDescription = "Mudar Tema",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
             }
         }
 
-        IconButton(
-            onClick = {
-                scope.launch {
-                    themeManager.toggleTheme()
-                }
+        if (generationLimitState is GenerationLimitState.Success) {
+            val info = (generationLimitState as GenerationLimitState.Success).info
+            val isLimitReached = info.used >= info.limit
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Status Chip customizado
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)) // Fundo subtil
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Bolt,
+                    contentDescription = null,
+                    tint = if (isLimitReached) Color(0xFFF44336) else YellowAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Gerações disponíveis: ",
+                    fontSize = 12.sp,
+                    color = TextSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "${info.remaining}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isLimitReached) Color(0xFFF44336) else MaterialTheme.colorScheme.onSurface
+                )
             }
-        ) {
-            Icon(
-                imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
-                contentDescription = "Mudar Tema",
-                tint = MaterialTheme.colorScheme.onBackground
-            )
         }
     }
 }

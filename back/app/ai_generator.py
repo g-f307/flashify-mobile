@@ -139,15 +139,20 @@ Crie {num_flashcards} flashcards de dificuldade {difficulty}, focando em {diffic
             "",
             "📌 PERGUNTAS (front):",
             "✓ UMA pergunta específica por flashcard (NUNCA duas ou mais perguntas juntas)",
-            "✓ Perguntas claras, diretas e desafiadoras (evite perguntas óbvias)",
+            "✓ Perguntas claras, diretas e COMPLETAMENTE RESPONDÍVEIS com a resposta fornecida",
             "✓ Máximo de 15-20 palavras por pergunta",
-            "✓ Use verbos de ação: 'Explique', 'Calcule', 'Compare', 'Identifique', 'Analise'",
+            "✓ Se perguntar 'Compare A e B', a resposta DEVE mencionar AMBOS explicitamente",
+            "✓ Use verbos de ação: 'Explique', 'Calcule', 'Defina', 'Identifique', 'Analise'",
+            "✓ Para comparações: use 'Qual a diferença entre...' EM VEZ DE 'Compare'",
             "✓ Para cálculos: forneça valores específicos e peça o resultado",
             "",
             "📌 RESPOSTAS (back):",
             "✓ Respostas CONCISAS e OBJETIVAS (máximo 3-4 linhas)",
             "✓ Vá direto ao ponto - sem introduções desnecessárias",
+            "✓ A resposta deve RESPONDER COMPLETAMENTE a pergunta feita",
+            "✓ Se a pergunta menciona dois conceitos, a resposta DEVE abordar AMBOS",
             "✓ Para cálculos: mostre o resultado e uma explicação breve (1-2 linhas)",
+            "✓ Para comparações: mencione EXPLICITAMENTE as diferenças ou semelhanças",
             "✓ Use bullet points quando listar itens múltiplos",
             "✓ Evite parágrafos longos - quebre em frases curtas",
             "",
@@ -167,9 +172,9 @@ Crie {num_flashcards} flashcards de dificuldade {difficulty}, focando em {diffic
 {
   "flashcards": [
     {
-      "front": "Qual estrutura de dados usa LIFO (Last In, First Out)?",
-      "back": "Stack (Pilha). O último elemento inserido é o primeiro a ser removido.",
-      "type": "concept"
+      "front": "Qual a diferença entre conexões HTTP persistentes e não persistentes?",
+      "back": "Persistentes: reutilizam mesma conexão TCP. Não persistentes: nova conexão para cada requisição.",
+      "type": "comparison"
     }
   ]
 }
@@ -177,8 +182,8 @@ Crie {num_flashcards} flashcards de dificuldade {difficulty}, focando em {diffic
 {
   "flashcards": [
     {
-      "front": "Por que usar uma Stack em vez de uma Queue para validar parênteses balanceados?",
-      "back": "Stack processa do fim para o início (LIFO), permitindo verificar pares mais recentes primeiro.",
+      "front": "Qual a principal vantagem das conexões HTTP persistentes sobre as não persistentes?",
+      "back": "Reduzem latência ao reutilizar a mesma conexão TCP, evitando sobrecarga de estabelecer novas conexões.",
       "type": "comparison"
     }
   ]
@@ -187,8 +192,8 @@ Crie {num_flashcards} flashcards de dificuldade {difficulty}, focando em {diffic
 {
   "flashcards": [
     {
-      "front": "Analise: Sistema com 1000 req/s. Stack overflow em 500ms. Qual a profundidade máxima de recursão?",
-      "back": "~500 chamadas. Cálculo: 1000 req/s ÷ 2 (500ms) = 500 operações antes do overflow.",
+      "front": "Analise: Site recebe 1000 req/s. Migrar de HTTP não persistente para persistente reduz latência em quanto?",
+      "back": "~60-70%. Elimina 3-way handshake TCP repetido. De ~150ms para ~50ms por requisição.",
       "type": "example"
     }
   ]
@@ -199,7 +204,10 @@ Crie {num_flashcards} flashcards de dificuldade {difficulty}, focando em {diffic
             "✗ Respostas com mais de 5 linhas",
             "✗ Múltiplas perguntas no mesmo 'front'",
             "✗ Perguntas genéricas como 'O que você sabe sobre X?'",
+            "✗ Perguntas que mencionam conceito A e B, mas resposta só fala de A",
+            "✗ Perguntas de comparação sem mencionar ambos os lados na resposta",
             "✗ Respostas que começam com 'Bem...', 'Basicamente...', 'É importante notar que...'",
+            "✗ Respostas incompletas que não respondem totalmente a pergunta",
         ]
     else:
         instruction = f"""Com base no texto fornecido, gere {num_flashcards} flashcards EFICIENTES de dificuldade {difficulty}.
@@ -221,15 +229,20 @@ Foque em {difficulty_instruction}."""
             "",
             "📌 PERGUNTAS (front):",
             "✓ UMA pergunta específica por flashcard (NUNCA duas ou mais perguntas juntas)",
-            "✓ Perguntas claras, diretas e desafiadoras (evite perguntas óbvias)",
+            "✓ Perguntas claras, diretas e COMPLETAMENTE RESPONDÍVEIS com a resposta fornecida",
             "✓ Máximo de 15-20 palavras por pergunta",
-            "✓ Use verbos de ação: 'Explique', 'Calcule', 'Compare', 'Identifique', 'Analise'",
+            "✓ Se perguntar 'Compare A e B', a resposta DEVE mencionar AMBOS explicitamente",
+            "✓ Use verbos de ação: 'Explique', 'Calcule', 'Defina', 'Identifique', 'Analise'",
+            "✓ Para comparações: use 'Qual a diferença entre...' EM VEZ DE 'Compare'",
             "✓ Para cálculos: forneça valores específicos e peça o resultado",
             "",
             "📌 RESPOSTAS (back):",
             "✓ Respostas CONCISAS e OBJETIVAS (máximo 3-4 linhas)",
             "✓ Vá direto ao ponto - sem introduções desnecessárias",
+            "✓ A resposta deve RESPONDER COMPLETAMENTE a pergunta feita",
+            "✓ Se a pergunta menciona dois conceitos, a resposta DEVE abordar AMBOS",
             "✓ Para cálculos: mostre o resultado e uma explicação breve (1-2 linhas)",
+            "✓ Para comparações: mencione EXPLICITAMENTE as diferenças ou semelhanças",
             "✓ Use bullet points quando listar itens múltiplos",
             "✓ Evite parágrafos longos - quebre em frases curtas",
             "",
@@ -250,9 +263,9 @@ Foque em {difficulty_instruction}."""
 {
   "flashcards": [
     {
-      "front": "Segundo o texto, o que é fotossíntese?",
-      "back": "Processo que converte luz solar em energia química nas plantas.",
-      "type": "concept"
+      "front": "Qual a diferença entre fotossíntese C3 e C4?",
+      "back": "C3: fixa CO₂ diretamente. C4: fixa CO₂ em duas etapas, mais eficiente em climas quentes.",
+      "type": "comparison"
     }
   ]
 }
@@ -260,8 +273,8 @@ Foque em {difficulty_instruction}."""
 {
   "flashcards": [
     {
-      "front": "Como a temperatura afeta a taxa de fotossíntese mencionada no texto?",
-      "back": "Aumenta até 30-35°C (ponto ótimo), depois diminui devido à desnaturação enzimática.",
+      "front": "Por que plantas C4 são mais eficientes que C3 em altas temperaturas?",
+      "back": "C4 concentra CO₂ internamente, reduzindo fotorrespiração que aumenta com calor em C3.",
       "type": "comparison"
     }
   ]
@@ -270,8 +283,8 @@ Foque em {difficulty_instruction}."""
 {
   "flashcards": [
     {
-      "front": "Analise: Se CO₂ aumentar 20% e luz cair 30%, qual impacto na fotossíntese segundo o texto?",
-      "back": "Redução líquida ~15%. Luz é fator limitante mais crítico que CO₂ em condições normais.",
+      "front": "Analise: Se temperatura subir de 25°C para 40°C, qual impacto em rendimento C3 vs C4?",
+      "back": "C3: queda ~40% (fotorrespiração). C4: queda ~10% (mecanismo concentrador protege).",
       "type": "example"
     }
   ]
@@ -282,8 +295,11 @@ Foque em {difficulty_instruction}."""
             "✗ Respostas com mais de 5 linhas",
             "✗ Múltiplas perguntas no mesmo 'front'",
             "✗ Perguntas genéricas como 'O que o texto fala sobre X?'",
+            "✗ Perguntas que mencionam conceito A e B, mas resposta só fala de A",
+            "✗ Perguntas de comparação sem mencionar ambos os lados na resposta",
             "✗ Respostas que começam com 'Bem...', 'Basicamente...', 'O texto menciona que...'",
             "✗ Copiar parágrafos inteiros do texto como resposta",
+            "✗ Respostas incompletas que não respondem totalmente a pergunta",
         ]
 
     try:
@@ -306,12 +322,12 @@ Foque em {difficulty_instruction}."""
     except Exception as e:
         print(f"🚨 Erro ao gerar flashcards: {type(e).__name__} - {e}")
         raise e
-    
+
 def generate_quiz_from_text(
     text: str, num_questions: int = 5, difficulty: str = "Médio"
 ) -> Optional[Dict[str, Any]]:
     """
-    Gera quizzes otimizados: perguntas plausíveis e alternativas concisas.
+    Gera quizzes otimizados com alternativas equilibradas e não previsíveis.
     """
     if not text or text.isspace():
         print("Texto de entrada está vazio. Pulando a geração de quiz.")
@@ -363,7 +379,7 @@ Crie um quiz com {num_questions} perguntas de dificuldade {difficulty}, focando 
         prompt_parts = [
             instruction,
             "",
-            "REGRAS CRÍTICAS PARA QUIZZES EFICIENTES:",
+            "REGRAS CRÍTICAS PARA QUIZZES EFICIENTES E NÃO PREVISÍVEIS:",
             "",
             f"🎯 NÍVEL DE DIFICULDADE: {difficulty.upper()}",
             f"   Foco: {difficulty_config['foco']}",
@@ -378,12 +394,15 @@ Crie um quiz com {num_questions} perguntas de dificuldade {difficulty}, focando 
             "✓ Desafiadoras mas justas - devem ter uma resposta definitivamente correta",
             "✓ Para cálculos: forneça todos os dados necessários",
             "",
-            "📌 ALTERNATIVAS:",
-            "✓ Cada alternativa com MÁXIMO de 15-20 palavras",
-            "✓ Alternativas CONCISAS e diretas ao ponto",
-            "✓ 1 resposta correta + 4 incorretas PLAUSÍVEIS (não absurdas)",
+            "📌 ALTERNATIVAS (ANTI-PADRÃO):",
+            "✓ TODAS as 5 alternativas devem ter comprimento SIMILAR (10-15 palavras cada)",
+            "✓ A resposta correta NÃO deve ser a mais longa ou detalhada",
+            "✓ Alternativas incorretas também devem ser completas e bem escritas",
+            "✓ Varie o TAMANHO: às vezes a correta é curta, às vezes é média",
+            "✓ 1 resposta correta + 4 incorretas IGUALMENTE PLAUSÍVEIS",
             "✓ Incorretas devem ser verossímeis mas factualmente erradas",
             "✓ Evite alternativas tipo 'Todas as anteriores' ou 'Nenhuma das anteriores'",
+            "✓ NUNCA use padrões: varie a posição da resposta correta (A, B, C, D ou E)",
             "",
             "📌 EXPLICAÇÕES:",
             "✓ Explicações BREVES (máximo 2-3 linhas)",
@@ -395,7 +414,7 @@ Crie um quiz com {num_questions} perguntas de dificuldade {difficulty}, focando 
             "✓ EXATAMENTE 1 resposta com 'is_correct': true por pergunta",
             "✓ Estrutura: {\"title\": \"...\", \"questions\": [{\"text\": \"...\", \"answers\": [...]}]}",
             "",
-            "EXEMPLO DE BOA PRÁTICA:",
+            "EXEMPLO DE BOA PRÁTICA (ALTERNATIVAS EQUILIBRADAS):",
             """
 {
   "title": "Quiz sobre Capitais",
@@ -403,52 +422,42 @@ Crie um quiz com {num_questions} perguntas de dificuldade {difficulty}, focando 
     {
       "text": "Qual é a capital do Brasil?",
       "answers": [
-        {"text": "São Paulo", "is_correct": false, "explanation": "São Paulo é a maior cidade, mas não a capital."},
-        {"text": "Rio de Janeiro", "is_correct": false, "explanation": "Foi capital até 1960, quando Brasília foi inaugurada."},
+        {"text": "São Paulo, centro econômico do país", "is_correct": false, "explanation": "São Paulo é a maior cidade, mas não a capital."},
+        {"text": "Rio de Janeiro, antiga capital", "is_correct": false, "explanation": "Foi capital até 1960, quando Brasília foi inaugurada."},
         {"text": "Brasília", "is_correct": true, "explanation": "Brasília é a capital federal desde 1960."},
-        {"text": "Salvador", "is_correct": false, "explanation": "Salvador foi a primeira capital do Brasil colonial."},
-        {"text": "Belo Horizonte", "is_correct": false, "explanation": "Belo Horizonte é capital de Minas Gerais, não do Brasil."}
-      ]
-    }
-  ]
-}
-            """ if difficulty == "Fácil" else """
-{
-  "title": "Quiz sobre Geografia Política",
-  "questions": [
-    {
-      "text": "Por que Brasília foi construída no Planalto Central?",
-      "answers": [
-        {"text": "Clima favorável", "is_correct": false, "explanation": "Clima não foi o fator determinante da localização."},
-        {"text": "Integração nacional e desenvolvimento do interior", "is_correct": true, "explanation": "Objetivo era descentralizar o poder e integrar regiões."},
-        {"text": "Proximidade com grandes centros", "is_correct": false, "explanation": "Na verdade, foi afastada dos grandes centros propositalmente."},
-        {"text": "Recursos naturais abundantes", "is_correct": false, "explanation": "Recursos não foram critério principal."},
-        {"text": "Pressão de movimentos sociais", "is_correct": false, "explanation": "Foi decisão governamental de planejamento estratégico."}
-      ]
-    }
-  ]
-}
-            """ if difficulty == "Médio" else """
-{
-  "title": "Quiz sobre Planejamento Urbano",
-  "questions": [
-    {
-      "text": "Analise o impacto do plano piloto de Brasília na segregação socioespacial atual.",
-      "answers": [
-        {"text": "Eliminou desigualdades urbanas", "is_correct": false, "explanation": "Segregação persiste nas cidades satélites."},
-        {"text": "Criou modelo replicável nacionalmente", "is_correct": false, "explanation": "Modelo mostrou-se pouco adaptável a outras realidades."},
-        {"text": "Concentrou elite no Plano Piloto, periferizando classes baixas", "is_correct": true, "explanation": "Design modernista acabou reforçando segregação espacial."},
-        {"text": "Não afetou estrutura social", "is_correct": false, "explanation": "Planejamento urbano tem impacto direto na organização social."},
-        {"text": "Resolveu problemas de moradia", "is_correct": false, "explanation": "Déficit habitacional persiste nas áreas periféricas."}
+        {"text": "Salvador, primeira capital brasileira", "is_correct": false, "explanation": "Salvador foi a primeira capital do Brasil colonial."},
+        {"text": "Belo Horizonte, capital de Minas", "is_correct": false, "explanation": "Belo Horizonte é capital de Minas Gerais, não do Brasil."}
       ]
     }
   ]
 }
             """,
             "",
+            "EXEMPLO RUIM (NÃO FAÇA ISSO):",
+            """
+{
+  "questions": [
+    {
+      "text": "Qual é a capital do Brasil?",
+      "answers": [
+        {"text": "São Paulo", "is_correct": false},
+        {"text": "Rio", "is_correct": false},
+        {"text": "Brasília, inaugurada em 21 de abril de 1960 como a nova capital federal do Brasil, projetada por Oscar Niemeyer e Lúcio Costa", "is_correct": true},
+        {"text": "Salvador", "is_correct": false},
+        {"text": "BH", "is_correct": false}
+      ]
+    }
+  ]
+}
+            """,
+            "❌ PROBLEMAS: Resposta correta é 3x maior que as outras, fácil de adivinhar!",
+            "",
             "⚠️ EVITE:",
+            "✗ Resposta correta sendo a mais longa ou detalhada",
+            "✗ Alternativas incorretas muito curtas ou incompletas",
+            "✗ Padrões previsíveis (sempre B ou C corretas)",
+            "✗ Alternativas com comprimentos muito diferentes",
             "✗ Perguntas impossíveis de responder sem consulta",
-            "✗ Alternativas com mais de 2 linhas",
             "✗ Alternativas obviamente absurdas",
             "✗ Perguntas ambíguas com múltiplas interpretações",
             "✗ Explicações longas e prolixas",
@@ -463,7 +472,7 @@ Foque em {difficulty_instruction}."""
             "TEXTO PARA ANÁLISE:",
             text[:15000],
             "",
-            "REGRAS CRÍTICAS PARA QUIZZES EFICIENTES:",
+            "REGRAS CRÍTICAS PARA QUIZZES EFICIENTES E NÃO PREVISÍVEIS:",
             "",
             f"🎯 NÍVEL DE DIFICULDADE: {difficulty.upper()}",
             f"   Foco: {difficulty_config['foco']}",
@@ -478,12 +487,15 @@ Foque em {difficulty_instruction}."""
             "✓ Desafiadoras mas justas - devem ter uma resposta definitivamente correta",
             "✓ Para cálculos: use dados do texto e forneça contexto completo",
             "",
-            "📌 ALTERNATIVAS:",
-            "✓ Cada alternativa com MÁXIMO de 15-20 palavras",
-            "✓ Alternativas CONCISAS e diretas ao ponto",
-            "✓ 1 resposta correta (baseada no texto) + 4 incorretas PLAUSÍVEIS",
+            "📌 ALTERNATIVAS (ANTI-PADRÃO):",
+            "✓ TODAS as 5 alternativas devem ter comprimento SIMILAR (10-15 palavras cada)",
+            "✓ A resposta correta NÃO deve ser a mais longa ou detalhada",
+            "✓ Alternativas incorretas também devem ser completas e bem escritas",
+            "✓ Varie o TAMANHO: às vezes a correta é curta, às vezes é média",
+            "✓ 1 resposta correta (baseada no texto) + 4 incorretas IGUALMENTE PLAUSÍVEIS",
             "✓ Incorretas devem parecer razoáveis mas serem factualmente erradas",
             "✓ Use informações próximas do texto para criar distratores críveis",
+            "✓ NUNCA use padrões: varie a posição da resposta correta (A, B, C, D ou E)",
             "",
             "📌 EXPLICAÇÕES:",
             "✓ Explicações BREVES (máximo 2-3 linhas)",
@@ -495,7 +507,7 @@ Foque em {difficulty_instruction}."""
             "✓ EXATAMENTE 1 resposta com 'is_correct': true por pergunta",
             "✓ Estrutura: {\"title\": \"...\", \"questions\": [{\"text\": \"...\", \"answers\": [...]}]}",
             "",
-            "EXEMPLO DE BOA PRÁTICA:",
+            "EXEMPLO DE BOA PRÁTICA (ALTERNATIVAS EQUILIBRADAS):",
             """
 {
   "title": "Quiz sobre o Texto",
@@ -503,52 +515,42 @@ Foque em {difficulty_instruction}."""
     {
       "text": "Segundo o texto, qual é a função principal do coração?",
       "answers": [
-        {"text": "Filtrar o sangue", "is_correct": false, "explanation": "Essa é função dos rins."},
-        {"text": "Produzir hemácias", "is_correct": false, "explanation": "Produção ocorre na medula óssea."},
-        {"text": "Bombear sangue para o corpo", "is_correct": true, "explanation": "O texto afirma que o coração bombeia sangue continuamente."},
-        {"text": "Armazenar oxigênio", "is_correct": false, "explanation": "Oxigênio é transportado, não armazenado."},
+        {"text": "Filtrar impurezas do sangue", "is_correct": false, "explanation": "Essa é função dos rins."},
+        {"text": "Produzir células vermelhas", "is_correct": false, "explanation": "Produção ocorre na medula óssea."},
+        {"text": "Bombear sangue pelo corpo", "is_correct": true, "explanation": "O texto afirma que o coração bombeia sangue continuamente."},
+        {"text": "Armazenar oxigênio para uso", "is_correct": false, "explanation": "Oxigênio é transportado, não armazenado."},
         {"text": "Regular temperatura corporal", "is_correct": false, "explanation": "Regulação térmica não é função cardíaca primária."}
-      ]
-    }
-  ]
-}
-            """ if difficulty == "Fácil" else """
-{
-  "title": "Quiz sobre o Texto",
-  "questions": [
-    {
-      "text": "Como o texto explica a relação entre frequência cardíaca e exercício físico?",
-      "answers": [
-        {"text": "Exercício não altera frequência", "is_correct": false, "explanation": "O texto menciona aumento durante atividade física."},
-        {"text": "Aumenta proporcionalmente à demanda de oxigênio", "is_correct": true, "explanation": "Texto explica que coração acelera para suprir necessidade muscular."},
-        {"text": "Diminui para economizar energia", "is_correct": false, "explanation": "Oposto do que ocorre durante exercício."},
-        {"text": "Mantém-se constante", "is_correct": false, "explanation": "Contradiz informação do texto sobre adaptação cardíaca."},
-        {"text": "Depende apenas da temperatura", "is_correct": false, "explanation": "Texto não atribui mudança somente à temperatura."}
-      ]
-    }
-  ]
-}
-            """ if difficulty == "Médio" else """
-{
-  "title": "Quiz sobre o Texto",
-  "questions": [
-    {
-      "text": "Analise: Se o texto indica FC máxima = 220-idade, qual impacto em treino de atleta de 40 anos?",
-      "answers": [
-        {"text": "Deve treinar sempre em FC máxima", "is_correct": false, "explanation": "Treino em máxima não é sustentável nem recomendado."},
-        {"text": "FC máxima de 180bpm define zonas de treino", "is_correct": true, "explanation": "Cálculo: 220-40=180. Zonas são % dessa máxima."},
-        {"text": "Idade não importa para atletas", "is_correct": false, "explanation": "Contradiz fórmula apresentada no texto."},
-        {"text": "Deve evitar qualquer exercício", "is_correct": false, "explanation": "Texto não sugere restrição, apenas cálculo de limites."},
-        {"text": "Pode exceder 220bpm regularmente", "is_correct": false, "explanation": "Fórmula indica limite teórico máximo seguro."}
       ]
     }
   ]
 }
             """,
             "",
+            "EXEMPLO RUIM (NÃO FAÇA ISSO):",
+            """
+{
+  "questions": [
+    {
+      "text": "Qual a função do coração?",
+      "answers": [
+        {"text": "Filtrar", "is_correct": false},
+        {"text": "Produzir", "is_correct": false},
+        {"text": "Bombear sangue por todo o corpo humano através de contrações rítmicas e coordenadas que distribuem oxigênio e nutrientes", "is_correct": true},
+        {"text": "Armazenar", "is_correct": false},
+        {"text": "Regular", "is_correct": false}
+      ]
+    }
+  ]
+}
+            """,
+            "❌ PROBLEMAS: Resposta correta é 4x maior, outras são palavras únicas!",
+            "",
             "⚠️ EVITE:",
+            "✗ Resposta correta sendo a mais longa ou detalhada",
+            "✗ Alternativas incorretas muito curtas ou incompletas",
+            "✗ Padrões previsíveis (sempre B ou C corretas)",
+            "✗ Alternativas com comprimentos muito diferentes",
             "✗ Perguntas sobre detalhes não mencionados no texto",
-            "✗ Alternativas com mais de 2 linhas",
             "✗ Alternativas obviamente absurdas ou fora do contexto",
             "✗ Perguntas que exigem conhecimento externo ao texto",
             "✗ Explicações que simplesmente repetem a alternativa",

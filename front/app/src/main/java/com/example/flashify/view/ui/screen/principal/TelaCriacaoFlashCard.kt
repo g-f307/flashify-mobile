@@ -31,18 +31,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.NavItem
 import com.example.flashify.model.util.*
+import com.example.flashify.view.ui.components.GenerationLimitBar
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
 import com.example.flashify.view.ui.theme.TextSecondary
 import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.DeckCreationState
 import com.example.flashify.viewmodel.DeckViewModel
+import com.example.flashify.viewmodel.GenerationLimitState
 import kotlin.math.roundToInt
 
 @Composable
 fun TelaCriacaoFlashCard(
     navController: NavController,
-    viewModel: DeckViewModel = hiltViewModel(), // ✅ Atualizado para hiltViewModel()
+    viewModel: DeckViewModel = hiltViewModel(), // ✅ Hilt ViewModel
     folderId: Int? = null
 ) {
     var currentStep by remember { mutableStateOf(1) }
@@ -58,7 +60,13 @@ fun TelaCriacaoFlashCard(
     var difficulty by remember { mutableStateOf("Médio") }
 
     val creationState by viewModel.deckCreationState.collectAsStateWithLifecycle()
+    val generationLimitState by viewModel.generationLimitState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // ✅ Verificar limite ao entrar na tela
+    LaunchedEffect(Unit) {
+        viewModel.checkGenerationLimit()
+    }
 
     LaunchedEffect(creationState) {
         when (val state = creationState) {
@@ -83,6 +91,16 @@ fun TelaCriacaoFlashCard(
         2 -> (creationMode == "text" && contentText.isNotBlank()) ||
                 (creationMode == "file" && selectedFileUri != null)
         else -> true
+    }
+
+    // ✅ Verificar se o limite foi atingido para bloquear o botão
+    val isLimitReached = remember(generationLimitState) {
+        if (generationLimitState is GenerationLimitState.Success) {
+            val info = (generationLimitState as GenerationLimitState.Success).info
+            info.used >= info.limit
+        } else {
+            false
+        }
     }
 
     Scaffold(
@@ -236,14 +254,31 @@ fun TelaCriacaoFlashCard(
                         flashcardQuantity = flashcardQuantity,
                         onQuantityChange = { flashcardQuantity = it }
                     )
-                    4 -> StepOptions(
-                        includeQuiz = includeQuiz,
-                        onIncludeQuizChange = { includeQuiz = it },
-                        quizQuantity = quizQuantity,
-                        onQuizQuantityChange = { quizQuantity = it },
-                        difficulty = difficulty,
-                        onDifficultyChange = { difficulty = it }
-                    )
+                    4 -> {
+                        StepOptions(
+                            includeQuiz = includeQuiz,
+                            onIncludeQuizChange = { includeQuiz = it },
+                            quizQuantity = quizQuantity,
+                            onQuizQuantityChange = { quizQuantity = it },
+                            difficulty = difficulty,
+                            onDifficultyChange = { difficulty = it }
+                        )
+
+                        // ✅ MOSTRAR BARRA DE LIMITE NO ÚLTIMO PASSO
+                        Spacer(modifier = Modifier.height(24.dp))
+                        if (generationLimitState is GenerationLimitState.Success) {
+                            val info = (generationLimitState as GenerationLimitState.Success).info
+                            GenerationLimitBar(
+                                used = info.used,
+                                limit = info.limit,
+                                hoursUntilReset = info.hoursUntilReset
+                            )
+                        } else if (generationLimitState is GenerationLimitState.Loading) {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = YellowAccent)
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -311,9 +346,10 @@ fun TelaCriacaoFlashCard(
                             .weight(1f)
                             .height(52.dp)
                             .shadow(6.dp, RoundedCornerShape(14.dp)),
-                        enabled = isNextEnabled && creationState !is DeckCreationState.Loading,
+                        // ✅ DESABILITAR BOTÃO SE LIMITE ATINGIDO
+                        enabled = isNextEnabled && creationState !is DeckCreationState.Loading && (!isLimitReached || currentStep < 4),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = YellowAccent,
+                            containerColor = if (isLimitReached && currentStep == 4) Color.Gray else YellowAccent,
                             contentColor = Color.Black
                         ),
                         shape = RoundedCornerShape(14.dp)
@@ -347,6 +383,9 @@ fun TelaCriacaoFlashCard(
     }
 }
 
+// Os outros componentes (StepIndicator, StepDeckName, StepContent, StepQuantity, StepOptions, etc.)
+// mantêm-se exatamente como no código original que você enviou e devem ser colados aqui.
+// Vou omiti-los para brevidade, mas eles são essenciais.
 @Composable
 fun StepIndicator(
     stepNumber: Int,

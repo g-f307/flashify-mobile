@@ -25,23 +25,22 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.AnswerResponse
-import com.example.flashify.model.data.QuestionResponse
 import com.example.flashify.model.data.QuizResponse
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.theme.TextSecondary
 import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.AnswerCheckState
+import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.QuizState
 import com.example.flashify.viewmodel.QuizViewModel
-import com.example.flashify.viewmodel.QuizSubmitState
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaQuiz(
     navController: NavController,
     documentId: Int,
-    viewModel: QuizViewModel = hiltViewModel() // ✅ Atualizado
+    viewModel: QuizViewModel = hiltViewModel(),
+    deckViewModel: DeckViewModel = hiltViewModel()
 ) {
     val quizState by viewModel.quizState.collectAsStateWithLifecycle()
 
@@ -96,6 +95,7 @@ fun TelaQuiz(
                         QuizContent(
                             quiz = state.quiz,
                             viewModel = viewModel,
+                            deckViewModel = deckViewModel,
                             navController = navController
                         )
                     }
@@ -105,10 +105,12 @@ fun TelaQuiz(
         }
     }
 }
+
 @Composable
 fun QuizContent(
     quiz: QuizResponse,
     viewModel: QuizViewModel,
+    deckViewModel: DeckViewModel,
     navController: NavController
 ) {
     var currentQuestionIndex by remember { mutableStateOf(0) }
@@ -117,17 +119,34 @@ fun QuizContent(
     var answeredQuestions by remember { mutableStateOf(setOf<Int>()) }
     var showResult by remember { mutableStateOf(false) }
 
+    // ✅ NOVO: State para forçar reload do quiz
+    var shouldReloadQuiz by remember { mutableStateOf(false) }
+
     val answerCheckState by viewModel.answerCheckState.collectAsStateWithLifecycle()
 
     val currentQuestion = quiz.questions.getOrNull(currentQuestionIndex)
     val progress = (currentQuestionIndex + 1).toFloat() / quiz.questions.size
 
+    // ✅ NOVO: Quando shouldReloadQuiz muda para true, busca novo quiz
+    LaunchedEffect(shouldReloadQuiz) {
+        if (shouldReloadQuiz) {
+            viewModel.loadQuiz(quiz.documentId)
+            shouldReloadQuiz = false
+        }
+    }
+
+    // ✅ Chamar a nova TelaResultadoQuiz com todos os parâmetros
     if (currentQuestion == null || showResult) {
         TelaResultadoQuiz(
             quizId = quiz.id,
+            documentId = quiz.documentId,
             totalQuestions = quiz.questions.size,
             correctAnswers = correctAnswersCount,
             onRetry = {
+                // ✅ MODIFICADO: Recarrega quiz ANTES de reiniciar
+                shouldReloadQuiz = true
+
+                // Reseta os contadores locais
                 currentQuestionIndex = 0
                 selectedAnswerId = null
                 correctAnswersCount = 0
@@ -137,13 +156,13 @@ fun QuizContent(
                 viewModel.resetSubmitState()
             },
             onFinish = {
-                // ✅ Marca quiz como completado ao voltar
                 navController.previousBackStackEntry
                     ?.savedStateHandle
                     ?.set("quiz_completed", true)
                 navController.popBackStack()
             },
-            viewModel = viewModel
+            viewModel = viewModel,
+            deckViewModel = deckViewModel
         )
         return
     }
@@ -390,7 +409,6 @@ fun AnswerOption(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Label (A, B, C, D, E)
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = borderColor.copy(alpha = 0.2f),
@@ -407,7 +425,6 @@ fun AnswerOption(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Texto da resposta
             Text(
                 text = answer.text,
                 fontSize = 16.sp,
@@ -416,7 +433,6 @@ fun AnswerOption(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            // Ícone de correto/incorreto
             androidx.compose.animation.AnimatedVisibility(
                 visible = answerCheckState is AnswerCheckState.Success && (isCorrectAnswer || isWrongSelection),
                 enter = fadeIn(),

@@ -28,6 +28,7 @@ import com.example.flashify.view.ui.components.EditFlashcardDialog
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.theme.TextSecondary
 import com.example.flashify.view.ui.theme.YellowAccent
+import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.FlashcardEditState
 import com.example.flashify.viewmodel.StudyState
 import com.example.flashify.viewmodel.StudyViewModel
@@ -38,7 +39,8 @@ import kotlinx.coroutines.delay
 fun TelaEstudo(
     navController: NavController,
     deckId: Int,
-    viewModel: StudyViewModel = hiltViewModel() // ✅ Atualizado
+    viewModel: StudyViewModel = hiltViewModel(),
+    deckViewModel: DeckViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.studyState.collectAsStateWithLifecycle()
     var elapsedTime by remember { mutableStateOf(0) }
@@ -48,7 +50,6 @@ fun TelaEstudo(
         viewModel.fetchFlashcards(deckId)
     }
 
-    // Timer
     LaunchedEffect(isTimerRunning) {
         while (isTimerRunning) {
             delay(1000)
@@ -127,6 +128,7 @@ fun TelaEstudo(
                     is StudyState.Success -> {
                         StudySession(
                             flashcards = state.flashcards,
+                            deckId = deckId,
                             onLogStudy = { flashcardId, accuracy ->
                                 viewModel.logStudyResult(flashcardId, accuracy)
                             },
@@ -134,7 +136,8 @@ fun TelaEstudo(
                                 isTimerRunning = false
                                 navController.popBackStack()
                             },
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            deckViewModel = deckViewModel
                         )
                     }
                 }
@@ -142,24 +145,28 @@ fun TelaEstudo(
         }
     }
 }
+
 @Composable
 fun StudySession(
     flashcards: List<FlashcardResponse>,
+    deckId: Int,
     onLogStudy: (Int, Float) -> Unit,
     onFinish: () -> Unit,
-    viewModel: StudyViewModel // ✅ NOVO PARÂMETRO
+    viewModel: StudyViewModel,
+    deckViewModel: DeckViewModel
 ) {
     var currentCardIndex by remember { mutableStateOf(0) }
     var isFlipped by remember { mutableStateOf(false) }
     var cardsCorrect by remember { mutableStateOf(0) }
     var cardsIncorrect by remember { mutableStateOf(0) }
-    var showCompletionDialog by remember { mutableStateOf(false) }
-    var showEditDialog by remember { mutableStateOf(false) } // ✅ NOVO ESTADO
+    var isSessionFinished by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
 
-    // ✅ OBSERVAR O ESTADO DE EDIÇÃO
+    // ✅ NOVO: State para forçar reload dos flashcards
+    var shouldReloadFlashcards by remember { mutableStateOf(false) }
+
     val editState by viewModel.editState.collectAsStateWithLifecycle()
 
-    // ✅ EFEITO PARA FECHAR DIALOG APÓS SUCESSO
     LaunchedEffect(editState) {
         if (editState is FlashcardEditState.Success) {
             showEditDialog = false
@@ -167,29 +174,49 @@ fun StudySession(
         }
     }
 
+    // ✅ NOVO: Quando shouldReloadFlashcards muda para true, busca novos flashcards
+    LaunchedEffect(shouldReloadFlashcards) {
+        if (shouldReloadFlashcards) {
+            viewModel.fetchFlashcards(deckId)
+            shouldReloadFlashcards = false
+        }
+    }
+
+    if (isSessionFinished) {
+        TelaResultadoEstudo(
+            documentId = deckId,
+            totalCards = flashcards.size,
+            knownCards = cardsCorrect,
+            learningCards = cardsIncorrect,
+            onRestart = {
+                // ✅ MODIFICADO: Recarrega flashcards ANTES de reiniciar
+                shouldReloadFlashcards = true
+
+                // Reseta os contadores locais
+                currentCardIndex = 0
+                cardsCorrect = 0
+                cardsIncorrect = 0
+                isFlipped = false
+                isSessionFinished = false
+            },
+            onFinish = onFinish,
+            deckViewModel = deckViewModel
+        )
+        return
+    }
+
     if (flashcards.isEmpty()) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier.padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    Icons.Default.Info,
-                    contentDescription = null,
-                    tint = YellowAccent,
-                    modifier = Modifier.size(64.dp)
-                )
+                Icon(Icons.Default.Info, null, tint = YellowAccent, modifier = Modifier.size(64.dp))
                 Spacer(Modifier.height(16.dp))
-                Text(
-                    "Este deck não contém flashcards.",
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Text("Este deck não contém flashcards.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
             }
         }
         return
@@ -216,11 +243,10 @@ fun StudySession(
             isFlipped = false
             currentCardIndex++
         } else {
-            showCompletionDialog = true
+            isSessionFinished = true
         }
     }
 
-    // ✅ DIALOG DE EDIÇÃO
     if (showEditDialog) {
         EditFlashcardDialog(
             currentFront = currentFlashcard.question,
@@ -237,24 +263,6 @@ fun StudySession(
                     newBack = newBack
                 )
             }
-        )
-    }
-
-    // ✅ SNACKBAR DE ERRO
-    if (editState is FlashcardEditState.Error) {
-        val error = (editState as FlashcardEditState.Error).message
-        LaunchedEffect(error) {
-            // Aqui você pode adicionar um Snackbar se quiser
-            println("Erro ao editar: $error")
-        }
-    }
-
-    if (showCompletionDialog) {
-        CompletionDialog(
-            totalCards = flashcards.size,
-            correctCards = cardsCorrect,
-            incorrectCards = cardsIncorrect,
-            onDismiss = onFinish
         )
     }
 
@@ -320,7 +328,7 @@ fun StudySession(
             isFlipped = isFlipped,
             rotation = rotation,
             onFlip = { isFlipped = !isFlipped },
-            onEdit = { showEditDialog = true } // ✅ ABRE O DIALOG
+            onEdit = { showEditDialog = true }
         )
 
         Spacer(Modifier.weight(1f))
@@ -383,14 +391,13 @@ fun StudySession(
     }
 }
 
-
 @Composable
 fun FlashcardView(
     flashcard: FlashcardResponse,
     isFlipped: Boolean,
     rotation: Float,
     onFlip: () -> Unit = {},
-    onEdit: () -> Unit = {} // ✅ NOVO PARÂMETRO
+    onEdit: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -412,7 +419,7 @@ fun FlashcardView(
                 .fillMaxSize()
                 .padding(32.dp)
         ) {
-            // ✅ BOTÃO DE EDIÇÃO (sempre visível no canto superior direito)
+            // Botão de edição
             IconButton(
                 onClick = onEdit,
                 modifier = Modifier
@@ -427,7 +434,6 @@ fun FlashcardView(
                 )
             }
 
-            // Conteúdo do flashcard
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -454,7 +460,7 @@ fun FlashcardView(
                         )
                     }
                 } else {
-                    // Back (Answer) - flipped horizontally
+                    // Back (Answer)
                     Column(
                         modifier = Modifier.graphicsLayer { rotationY = 180f },
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -481,7 +487,6 @@ fun FlashcardView(
     }
 }
 
-
 @Composable
 fun StatBadge(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -491,9 +496,7 @@ fun StatBadge(
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = color.copy(alpha = 0.2f)
-        )
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.2f))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -507,111 +510,14 @@ fun StatBadge(
                     .background(color.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
             }
             Column {
-                Text(
-                    "$value",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = color
-                )
-                Text(
-                    label,
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
+                Text("$value", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+                Text(label, fontSize = 12.sp, color = TextSecondary)
             }
         }
     }
-}
-
-@Composable
-fun CompletionDialog(
-    totalCards: Int,
-    correctCards: Int,
-    incorrectCards: Int,
-    onDismiss: () -> Unit
-) {
-    val accuracy = if (totalCards > 0) (correctCards.toFloat() / totalCards * 100).toInt() else 0
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = YellowAccent,
-                    modifier = Modifier.size(64.dp)
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Sessão Concluída!",
-                    textAlign = TextAlign.Center
-                )
-            }
-        },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "Você completou $totalCards flashcards",
-                    textAlign = TextAlign.Center,
-                    color = TextSecondary
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "$correctCards",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF4CAF50)
-                        )
-                        Text("Acertos", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "$incorrectCards",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF44336)
-                        )
-                        Text("Erros", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "$accuracy%",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = YellowAccent
-                        )
-                        Text("Precisão", fontSize = 12.sp, color = TextSecondary)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = YellowAccent,
-                    contentColor = Color.Black
-                )
-            ) {
-                Text("Finalizar", fontWeight = FontWeight.Bold)
-            }
-        },
-        shape = RoundedCornerShape(16.dp)
-    )
 }
 
 fun formatTime(seconds: Int): String {

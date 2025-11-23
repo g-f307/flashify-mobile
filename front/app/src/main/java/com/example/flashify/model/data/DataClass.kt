@@ -272,3 +272,20 @@ data class DeckStatsResponse(
 data class GoogleIdTokenRequest(
     @SerializedName("id_token") val idToken: String
 )
+
+data class GenerationLimitResponse(
+    val limit: Int,
+    val used: Int,
+    val remaining: Int,
+    @SerializedName("hours_until_reset") val hoursUntilReset: Float
+)
+
+data class AddFlashcardsRequest(
+    @SerializedName("num_flashcards") val numFlashcards: Int,
+    val difficulty: String = "Médio"
+)
+
+data class AddQuestionsRequest(
+    @SerializedName("num_questions") val numQuestions: Int,
+    val difficulty: String = "Médio"
+)
