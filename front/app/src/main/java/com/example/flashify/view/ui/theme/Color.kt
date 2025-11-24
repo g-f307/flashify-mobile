@@ -36,3 +36,9 @@ val YellowGradientStart = Color(0xFFFBC02D)
 val LightYellowBackground = Color(0xFFFFFDE7)
 val CardBackgroundLight = Color.White
 val TextColorLight = Color(0xFF1C1C1E)
+
+// ===== CORES DA MARCA FLASHIFY (NOVAS) =====
+val YellowFlashify = Color(0xFFFFC300) // Amarelo Principal
+val CyanFlashify = Color(0xFF6BDEF3)   // Ciano Secundário
+val DarkText = Color(0xFF1C1C1E)       // Preto Suave para Texto
+val WhiteBackground = Color(0xFFF8F9FA) // Fundo Off-White
