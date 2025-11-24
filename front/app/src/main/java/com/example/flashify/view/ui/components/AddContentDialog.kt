@@ -48,7 +48,6 @@ fun AddContentDialog(
     isLoading: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (Int, String) -> Unit,
-    // ✅ NOVO: Parâmetro para verificar limite
     hasGenerationLimit: Boolean = false
 ) {
     var quantity by remember { mutableStateOf(5) }

@@ -19,6 +19,7 @@ import com.example.flashify.view.ui.screen.principal.TelaQuiz
 import com.example.flashify.view.ui.screen.principal.TelaEscolhaModoEstudo
 import com.example.flashify.view.ui.screen.principal.TelaDetalhePasta
 import com.example.flashify.view.ui.screen.principal.TelaContentLoader
+import com.example.flashify.view.ui.screen.landing.TelaLanding
 
 
 // Importando o TokenManager
@@ -26,6 +27,7 @@ import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.view.ui.screen.login.TelaRegistro
 
 // --- Definindo as "Rotas" (os nomes das nossas telas) ---
+const val LANDING_SCREEN_ROUTE = "landing_screen"
 const val LOGIN_SCREEN_ROUTE = "login_screen"
 const val REGISTER_SCREEN_ROUTE = "register_screen"
 const val MAIN_SCREEN_ROUTE = "main_screen"
@@ -49,12 +51,11 @@ fun AppNavigation() {
     // 2. Verifica se existe um token guardado
     val token = tokenManager.getToken()
     // 3. Define a rota inicial com base na existência do token
-    val startDestination = if (token != null && token.startsWith("Bearer ")) {
-        // Se existe um token válido, começa na tela principal
+    val startDestination =
+        if (token != null && token.startsWith("Bearer ")) {
         MAIN_SCREEN_ROUTE
     } else {
-        // Se não existe token, começa na tela de login
-        LOGIN_SCREEN_ROUTE
+        LANDING_SCREEN_ROUTE // ✅ MUDANÇA AQUI (era LOGIN_SCREEN_ROUTE)
     }
 
     NavHost(
@@ -62,6 +63,9 @@ fun AppNavigation() {
         startDestination = startDestination // Usa a rota inicial dinâmica
     ) {
         // --- Definições das Rotas (como antes) ---
+        composable(route = LANDING_SCREEN_ROUTE) {
+            TelaLanding(navController = navController)
+        }
         composable(route = LOGIN_SCREEN_ROUTE) {
             TelaLogin(navController = navController)
         }
