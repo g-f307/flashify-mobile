@@ -3,6 +3,8 @@ package com.example.flashify.view.ui.screen.principal
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,14 +16,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.view.ui.components.*
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.AddContentState
 import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.GenerationLimitState
@@ -36,19 +41,21 @@ fun TelaResultadoEstudo(
     onFinish: () -> Unit,
     deckViewModel: DeckViewModel
 ) {
+    // --- LÓGICA DO TEMA ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     val accuracy = if (totalCards > 0) knownCards.toFloat() / totalCards else 0f
     val score = accuracy * 100
 
     val addContentState by deckViewModel.addContentState.collectAsStateWithLifecycle()
     val generationLimitState by deckViewModel.generationLimitState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     var showAddDialog by remember { mutableStateOf(false) }
-
-    // ✅ NOVO: Flag para controlar redirecionamento automático
     var shouldAutoRedirect by remember { mutableStateOf(false) }
 
-    // ✅ VERIFICAR LIMITE DE GERAÇÕES
     val hasGenerationLimit = remember(generationLimitState) {
         if (generationLimitState is GenerationLimitState.Success) {
             val info = (generationLimitState as GenerationLimitState.Success).info
@@ -58,43 +65,25 @@ fun TelaResultadoEstudo(
         }
     }
 
-    // ✅ CORRIGIDO: Fluxo de redirecionamento após sucesso
     LaunchedEffect(addContentState) {
         when (val state = addContentState) {
             is AddContentState.Success -> {
-                Toast.makeText(
-                    context,
-                    state.message,
-                    Toast.LENGTH_SHORT
-                ).show()
-
-                // ✅ FECHA O DIÁLOGO IMEDIATAMENTE
+                Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
                 showAddDialog = false
-
-                // ✅ MARCA PARA REDIRECIONAMENTO AUTOMÁTICO
                 shouldAutoRedirect = true
-
-                // ✅ AGUARDA 800MS E REDIRECIONA
                 kotlinx.coroutines.delay(800)
                 deckViewModel.resetAddContentState()
-                onRestart() // ✅ REDIRECIONA AUTOMATICAMENTE
+                onRestart()
             }
-
             is AddContentState.Error -> {
-                Toast.makeText(
-                    context,
-                    state.message,
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
                 deckViewModel.resetAddContentState()
                 showAddDialog = false
             }
-
             else -> {}
         }
     }
 
-    // ✅ DIÁLOGO COM VERIFICAÇÃO DE LIMITE
     if (showAddDialog) {
         AddContentDialog(
             title = "Adicionar Flashcards",
@@ -109,7 +98,6 @@ fun TelaResultadoEstudo(
                 deckViewModel.resetAddContentState()
             },
             onConfirm = { qtd, difficulty ->
-                // ✅ DUPLA VERIFICAÇÃO antes de enviar
                 if (!hasGenerationLimit) {
                     deckViewModel.addFlashcardsToDeck(documentId, qtd, difficulty)
                 }
@@ -117,7 +105,8 @@ fun TelaResultadoEstudo(
         )
     }
 
-    GradientBackgroundScreen {
+    // ✅ Passamos isDarkTheme para o gradiente
+    GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -134,37 +123,63 @@ fun TelaResultadoEstudo(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                PerformanceCard {
-                    CircularPerformanceChart(
-                        percentage = accuracy,
-                        color = if (score >= 80) Color(0xFF4CAF50) else YellowAccent
-                    )
-
-                    Divider(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        thickness = 1.dp
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                // ✅ CARD DE PERFORMANCE COM BORDA
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(8.dp, RoundedCornerShape(20.dp)),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    // Borda adicionada para definição no modo claro
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        StatItem(Icons.Default.School, "Dominados", "$knownCards", Color(0xFF4CAF50))
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(48.dp)
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                        CircularPerformanceChart(
+                            percentage = accuracy,
+                            color = if (score >= 80) Color(0xFF4CAF50) else primaryColor
                         )
-                        StatItem(Icons.Default.MenuBook, "A Revisar", "$learningCards", YellowAccent)
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(48.dp)
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Divider(
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+                            thickness = 1.dp
                         )
-                        StatItem(Icons.Default.Layers, "Total", "$totalCards", Color(0xFF2196F3))
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ResultStatItem(Icons.Default.School, "Dominados", "$knownCards", Color(0xFF4CAF50))
+
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(40.dp)
+                                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                            )
+
+                            ResultStatItem(Icons.Default.MenuBook, "A Revisar", "$learningCards", primaryColor)
+
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(40.dp)
+                                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                            )
+
+                            // Azul ou cor secundária do tema
+                            val infoColor = if (isDarkTheme) Color(0xFF2196F3) else Color(0xFF0288D1)
+                            ResultStatItem(Icons.Default.Layers, "Total", "$totalCards", infoColor)
+                        }
                     }
                 }
 
@@ -176,8 +191,8 @@ fun TelaResultadoEstudo(
                         .fillMaxWidth()
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = YellowAccent,
-                        contentColor = Color.Black
+                        containerColor = primaryColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     shape = RoundedCornerShape(16.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
@@ -190,32 +205,28 @@ fun TelaResultadoEstudo(
                 if (totalCards < 20) {
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    val addColor = Color(0xFF26C6DA) // Ciano
+
                     OutlinedButton(
                         onClick = {
-                            // ✅ VERIFICAR LIMITE ANTES DE ABRIR DIÁLOGO
                             if (!hasGenerationLimit) {
                                 showAddDialog = true
                             } else {
-                                Toast.makeText(
-                                    context,
-                                    "Limite diário de gerações atingido!",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                Toast.makeText(context, "Limite diário de gerações atingido!", Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        border = BorderStroke(1.5.dp, Color(0xFF26C6DA)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF26C6DA)),
+                        border = BorderStroke(1.5.dp, addColor),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = addColor),
                         shape = RoundedCornerShape(16.dp),
-                        // ✅ BOTÃO DESABILITADO se limite atingido OU se está carregando
                         enabled = !hasGenerationLimit && addContentState !is AddContentState.Loading
                     ) {
                         if (addContentState is AddContentState.Loading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
-                                color = Color(0xFF26C6DA),
+                                color = addColor,
                                 strokeWidth = 2.dp
                             )
                             Spacer(Modifier.width(10.dp))
@@ -242,6 +253,8 @@ fun TelaResultadoEstudo(
                     .align(Alignment.TopEnd)
                     .padding(top = 12.dp, end = 12.dp)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), CircleShape)
+                    // Adicionada borda subtil ao botão de fechar
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), CircleShape)
                     .size(40.dp)
             ) {
                 Icon(
@@ -252,5 +265,35 @@ fun TelaResultadoEstudo(
                 )
             }
         }
+    }
+}
+
+// ✅ Componente local para garantir o estilo correto dos itens de estatística
+@Composable
+fun ResultStatItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = value,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

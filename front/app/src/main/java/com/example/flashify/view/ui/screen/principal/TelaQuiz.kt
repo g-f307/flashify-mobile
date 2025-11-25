@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -26,9 +28,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.AnswerResponse
 import com.example.flashify.model.data.QuizResponse
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.AnswerCheckState
 import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.QuizState
@@ -42,27 +43,42 @@ fun TelaQuiz(
     viewModel: QuizViewModel = hiltViewModel(),
     deckViewModel: DeckViewModel = hiltViewModel()
 ) {
+    // --- LÓGICA DO TEMA ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     val quizState by viewModel.quizState.collectAsStateWithLifecycle()
 
     LaunchedEffect(documentId) {
         viewModel.loadQuiz(documentId)
     }
 
-    GradientBackgroundScreen {
+    // ✅ Passamos isDarkTheme para o gradiente
+    GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text("Quiz", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground) },
+                    title = {
+                        Text(
+                            "Quiz",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.Default.ArrowBack, "Voltar", tint = MaterialTheme.colorScheme.onBackground)
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                "Voltar",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        titleContentColor = MaterialTheme.colorScheme.onBackground,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+                        containerColor = Color.Transparent
                     )
                 )
             }
@@ -74,7 +90,7 @@ fun TelaQuiz(
                 contentAlignment = Alignment.Center
             ) {
                 when (val state = quizState) {
-                    is QuizState.Loading -> CircularProgressIndicator()
+                    is QuizState.Loading -> CircularProgressIndicator(color = primaryColor)
                     is QuizState.Error -> {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -86,7 +102,13 @@ fun TelaQuiz(
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            Button(onClick = { navController.popBackStack() }) {
+                            Button(
+                                onClick = { navController.popBackStack() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = primaryColor,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
                                 Text("Voltar")
                             }
                         }
@@ -113,13 +135,14 @@ fun QuizContent(
     deckViewModel: DeckViewModel,
     navController: NavController
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     var currentQuestionIndex by remember { mutableStateOf(0) }
     var selectedAnswerId by remember { mutableStateOf<Int?>(null) }
     var correctAnswersCount by remember { mutableStateOf(0) }
     var answeredQuestions by remember { mutableStateOf(setOf<Int>()) }
     var showResult by remember { mutableStateOf(false) }
-
-    // ✅ NOVO: State para forçar reload do quiz
     var shouldReloadQuiz by remember { mutableStateOf(false) }
 
     val answerCheckState by viewModel.answerCheckState.collectAsStateWithLifecycle()
@@ -127,7 +150,6 @@ fun QuizContent(
     val currentQuestion = quiz.questions.getOrNull(currentQuestionIndex)
     val progress = (currentQuestionIndex + 1).toFloat() / quiz.questions.size
 
-    // ✅ NOVO: Quando shouldReloadQuiz muda para true, busca novo quiz
     LaunchedEffect(shouldReloadQuiz) {
         if (shouldReloadQuiz) {
             viewModel.loadQuiz(quiz.documentId)
@@ -135,7 +157,6 @@ fun QuizContent(
         }
     }
 
-    // ✅ Chamar a nova TelaResultadoQuiz com todos os parâmetros
     if (currentQuestion == null || showResult) {
         TelaResultadoQuiz(
             quizId = quiz.id,
@@ -143,10 +164,7 @@ fun QuizContent(
             totalQuestions = quiz.questions.size,
             correctAnswers = correctAnswersCount,
             onRetry = {
-                // ✅ MODIFICADO: Recarrega quiz ANTES de reiniciar
                 shouldReloadQuiz = true
-
-                // Reseta os contadores locais
                 currentQuestionIndex = 0
                 selectedAnswerId = null
                 correctAnswersCount = 0
@@ -181,12 +199,12 @@ fun QuizContent(
             ) {
                 Text(
                     text = "${currentQuestionIndex + 1}/${quiz.questions.size}",
-                    color = YellowAccent,
+                    color = primaryColor,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "${(progress * 100).toInt()}% concluído",
-                    color = TextSecondary,
+                    color = onSurfaceVariant,
                     fontSize = 14.sp
                 )
             }
@@ -196,8 +214,8 @@ fun QuizContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),
-                color = YellowAccent,
-                trackColor = Color.Gray.copy(alpha = 0.3f)
+                color = primaryColor,
+                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             )
         }
 
@@ -209,13 +227,15 @@ fun QuizContent(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
-            )
+            ),
+            // ✅ Borda adicionada
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
                     text = "Pergunta ${currentQuestionIndex + 1}",
                     fontSize = 14.sp,
-                    color = YellowAccent,
+                    color = primaryColor,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -258,10 +278,11 @@ fun QuizContent(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (checkState.result.isCorrect)
-                            Color.Green.copy(alpha = 0.2f)
+                            Color.Green.copy(alpha = 0.1f)
                         else
-                            Color.Red.copy(alpha = 0.2f)
-                    )
+                            Color.Red.copy(alpha = 0.1f)
+                    ),
+                    border = BorderStroke(1.dp, if (checkState.result.isCorrect) Color.Green.copy(alpha=0.5f) else Color.Red.copy(alpha=0.5f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -301,8 +322,8 @@ fun QuizContent(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = YellowAccent,
-                        contentColor = Color.Black
+                        containerColor = primaryColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -326,15 +347,15 @@ fun QuizContent(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = selectedAnswerId != null && answerCheckState !is AnswerCheckState.Loading,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = YellowAccent,
-                        contentColor = Color.Black
+                        containerColor = primaryColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (answerCheckState is AnswerCheckState.Loading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
-                            color = Color.Black
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
                         Text(
@@ -368,6 +389,7 @@ fun AnswerOption(
     selectedAnswerId: Int?,
     onClick: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
     val labels = listOf("A", "B", "C", "D", "E")
     val label = labels.getOrNull(index) ?: "${index + 1}"
 
@@ -379,17 +401,18 @@ fun AnswerOption(
         isSelected && !answerCheckState.result.isCorrect
     } else false
 
+    // Cores dinâmicas baseadas no estado e tema
     val borderColor = when {
         isCorrectAnswer -> Color.Green
         isWrongSelection -> Color.Red
-        isSelected -> YellowAccent
-        else -> Color.Gray.copy(alpha = 0.3f)
+        isSelected -> primaryColor
+        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
     }
 
     val backgroundColor = when {
         isCorrectAnswer -> Color.Green.copy(alpha = 0.1f)
         isWrongSelection -> Color.Red.copy(alpha = 0.1f)
-        isSelected -> YellowAccent.copy(alpha = 0.1f)
+        isSelected -> primaryColor.copy(alpha = 0.1f)
         else -> MaterialTheme.colorScheme.surface
     }
 
@@ -397,7 +420,7 @@ fun AnswerOption(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(2.dp, borderColor),
+        border = BorderStroke(if (isSelected || isCorrectAnswer || isWrongSelection) 2.dp else 1.dp, borderColor),
         colors = CardDefaults.outlinedCardColors(
             containerColor = backgroundColor
         ),
@@ -418,7 +441,7 @@ fun AnswerOption(
                     Text(
                         text = label,
                         fontWeight = FontWeight.Bold,
-                        color = borderColor
+                        color = if (isSelected || isCorrectAnswer || isWrongSelection) borderColor else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -433,7 +456,7 @@ fun AnswerOption(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            androidx.compose.animation.AnimatedVisibility(
+            AnimatedVisibility(
                 visible = answerCheckState is AnswerCheckState.Success && (isCorrectAnswer || isWrongSelection),
                 enter = fadeIn(),
                 exit = fadeOut()

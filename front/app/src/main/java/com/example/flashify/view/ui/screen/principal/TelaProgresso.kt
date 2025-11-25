@@ -2,8 +2,10 @@ package com.example.flashify.view.ui.screen.principal
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,19 +32,28 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.NavItem
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.*
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.HomeViewModel
 import kotlin.math.roundToInt
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun TelaProgresso(
     navController: NavController,
     homeViewModel: HomeViewModel = hiltViewModel()
 ) {
+    // --- LÓGICA DO TEMA ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+
+    // Cores do Tema
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
@@ -58,12 +69,9 @@ fun TelaProgresso(
         NavItem("Config", Icons.Default.Settings)
     )
 
-    // Calcular precisão dos Flashcards (valor entre 0 e 1)
     val realAccuracy = remember(homeState.generalAccuracy) {
         when {
-            // Se vier como 92.3, converter para 0.923
             homeState.generalAccuracy > 1.0 -> homeState.generalAccuracy / 100.0
-            // Se já vier como 0.923, manter
             else -> homeState.generalAccuracy
         }.coerceIn(0.0, 1.0)
     }
@@ -71,7 +79,6 @@ fun TelaProgresso(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            // ✅ CORREÇÃO APLICADA: Column com navigationBarsPadding
             Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
                     navItems = navItems,
@@ -98,7 +105,8 @@ fun TelaProgresso(
             }
         }
     ) { innerPadding ->
-        GradientBackgroundScreen {
+        // ✅ Passamos isDarkTheme para o gradiente
+        GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -120,8 +128,8 @@ fun TelaProgresso(
                             .background(
                                 brush = Brush.verticalGradient(
                                     colors = listOf(
-                                        YellowAccent.copy(alpha = 0.3f),
-                                        YellowAccent.copy(alpha = 0.15f)
+                                        primaryColor.copy(alpha = 0.3f),
+                                        primaryColor.copy(alpha = 0.15f)
                                     )
                                 )
                             ),
@@ -130,7 +138,7 @@ fun TelaProgresso(
                         Icon(
                             Icons.Default.TrendingUp,
                             contentDescription = null,
-                            tint = YellowAccent,
+                            tint = primaryColor,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -145,7 +153,7 @@ fun TelaProgresso(
                         Text(
                             "Acompanhe sua evolução",
                             fontSize = 14.sp,
-                            color = TextSecondary
+                            color = onSurfaceVariant
                         )
                     }
                 }
@@ -157,14 +165,15 @@ fun TelaProgresso(
                         modifier = Modifier.fillMaxWidth().height(200.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = YellowAccent)
+                        CircularProgressIndicator(color = primaryColor)
                     }
                 } else if (homeState.errorMessage != null) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
@@ -201,14 +210,14 @@ fun TelaProgresso(
                             value = "${homeState.cardsStudiedWeek}",
                             subtitle = "cards",
                             icon = Icons.Default.Style,
-                            color = YellowAccent,
+                            color = primaryColor,
                             modifier = Modifier.weight(1f)
                         )
                     }
 
                     Spacer(Modifier.height(12.dp))
 
-                    // Precisão dividida por tipo - DADOS REAIS
+                    // Precisão dividida por tipo
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -217,7 +226,7 @@ fun TelaProgresso(
                             title = "Flashcards",
                             percentage = (realAccuracy * 100).roundToInt(),
                             icon = Icons.Default.Style,
-                            color = YellowAccent,
+                            color = primaryColor,
                             modifier = Modifier.weight(1f)
                         )
 
@@ -225,20 +234,22 @@ fun TelaProgresso(
                             title = "Quiz",
                             percentage = homeState.quizAverageScore.roundToInt(),
                             icon = Icons.Default.Quiz,
-                            color = Color(0xFF00BCD4),
+                            // Cor ciano adaptada ao tema, se necessário
+                            color = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7),
                             modifier = Modifier.weight(1f)
                         )
                     }
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Visão geral com gráfico circular - DADOS REAIS
+                    // Visão geral com gráfico circular
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                     ) {
                         Column(
                             modifier = Modifier.padding(24.dp)
@@ -249,7 +260,7 @@ fun TelaProgresso(
                                 Icon(
                                     Icons.Default.Insights,
                                     contentDescription = null,
-                                    tint = YellowAccent,
+                                    tint = primaryColor,
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Spacer(Modifier.width(12.dp))
@@ -263,7 +274,7 @@ fun TelaProgresso(
                                     Text(
                                         "Seu desempenho total",
                                         fontSize = 13.sp,
-                                        color = TextSecondary
+                                        color = onSurfaceVariant
                                     )
                                 }
                             }
@@ -275,12 +286,12 @@ fun TelaProgresso(
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Gráfico circular - DADOS REAIS
+                                // Gráfico circular
                                 Box(contentAlignment = Alignment.Center) {
                                     CircularProgressBar(
                                         percentage = (realAccuracy * 100).toFloat(),
                                         radius = 70.dp,
-                                        color = YellowAccent,
+                                        color = primaryColor,
                                         strokeWidth = 10.dp
                                     )
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -293,12 +304,12 @@ fun TelaProgresso(
                                         Text(
                                             "precisão",
                                             fontSize = 12.sp,
-                                            color = TextSecondary
+                                            color = onSurfaceVariant
                                         )
                                     }
                                 }
 
-                                // Estatísticas complementares - DADOS REAIS
+                                // Estatísticas complementares
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
@@ -322,7 +333,7 @@ fun TelaProgresso(
                                         icon = Icons.Default.Star,
                                         label = "Total",
                                         value = "$totalCards",
-                                        color = YellowAccent
+                                        color = primaryColor
                                     )
                                 }
                             }
@@ -331,13 +342,14 @@ fun TelaProgresso(
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Atividade semanal - DADOS REAIS
+                    // Atividade semanal
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
                             Row(
@@ -346,7 +358,7 @@ fun TelaProgresso(
                                 Icon(
                                     Icons.Default.CalendarMonth,
                                     contentDescription = null,
-                                    tint = Color(0xFF00BCD4),
+                                    tint = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7),
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Spacer(Modifier.width(12.dp))
@@ -360,7 +372,7 @@ fun TelaProgresso(
                                     Text(
                                         "Últimos 7 dias",
                                         fontSize = 13.sp,
-                                        color = TextSecondary
+                                        color = onSurfaceVariant
                                     )
                                 }
                             }
@@ -368,20 +380,22 @@ fun TelaProgresso(
                             Spacer(Modifier.height(20.dp))
 
                             WeeklyActivityChart(
-                                weeklyActivity = homeState.weeklyActivity
+                                weeklyActivity = homeState.weeklyActivity,
+                                primaryColor = primaryColor
                             )
                         }
                     }
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Conquistas - DADOS REAIS
+                    // Conquistas
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
                             Row(
@@ -404,7 +418,7 @@ fun TelaProgresso(
                                     Text(
                                         "Continue progredindo!",
                                         fontSize = 13.sp,
-                                        color = TextSecondary
+                                        color = onSurfaceVariant
                                     )
                                 }
                             }
@@ -440,7 +454,8 @@ fun StatCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier
@@ -474,7 +489,7 @@ fun StatCard(
                 Text(
                     subtitle,
                     fontSize = 11.sp,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
             }
@@ -495,7 +510,8 @@ fun AccuracyCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier
@@ -534,7 +550,6 @@ fun AccuracyCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Barra de progresso
                 LinearProgressIndicator(
                     progress = { percentage / 100f },
                     modifier = Modifier
@@ -542,7 +557,7 @@ fun AccuracyCard(
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
                     color = color,
-                    trackColor = Color.Gray.copy(alpha = 0.2f)
+                    trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                 )
             }
         }
@@ -570,7 +585,7 @@ fun MiniStatItem(
             Text(
                 label,
                 fontSize = 11.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 value,
@@ -595,6 +610,9 @@ fun CircularProgressBar(
         label = "progress"
     )
 
+    // Cor do track adapta-se ao tema (mais escura no claro, mais clara no escuro)
+    val trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+
     Canvas(
         modifier = Modifier.size(radius * 2)
     ) {
@@ -603,7 +621,7 @@ fun CircularProgressBar(
 
         // Background circle
         drawArc(
-            color = Color.Gray.copy(alpha = 0.2f),
+            color = trackColor,
             startAngle = -90f,
             sweepAngle = 360f,
             useCenter = false,
@@ -626,9 +644,10 @@ fun CircularProgressBar(
 }
 
 @Composable
-fun WeeklyActivityChart(weeklyActivity: List<Int>) {
-    // A lista do backend começa na Segunda (índice 0)
+fun WeeklyActivityChart(weeklyActivity: List<Int>, primaryColor: Color) {
     val daysOfWeek = listOf("S", "T", "Q", "Q", "S", "S", "D")
+    val isDarkTheme = isSystemInDarkTheme()
+    val secondaryColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
 
     val safeWeeklyActivity = if (weeklyActivity.size >= 7) {
         weeklyActivity.take(7)
@@ -667,15 +686,15 @@ fun WeeklyActivityChart(weeklyActivity: List<Int>) {
                                     if (value > 0) {
                                         Brush.verticalGradient(
                                             colors = listOf(
-                                                if (isHighest) YellowAccent else Color(0xFF00BCD4),
-                                                if (isHighest) YellowAccent.copy(0.7f) else Color(0xFF00BCD4).copy(0.7f)
+                                                if (isHighest) primaryColor else secondaryColor,
+                                                if (isHighest) primaryColor.copy(0.7f) else secondaryColor.copy(0.7f)
                                             )
                                         )
                                     } else {
                                         Brush.verticalGradient(
                                             colors = listOf(
-                                                Color.Gray.copy(alpha = 0.3f),
-                                                Color.Gray.copy(alpha = 0.2f)
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                             )
                                         )
                                     }
@@ -686,7 +705,7 @@ fun WeeklyActivityChart(weeklyActivity: List<Int>) {
                     Text(
                         daysOfWeek.getOrNull(index) ?: "",
                         fontSize = 12.sp,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
@@ -694,8 +713,8 @@ fun WeeklyActivityChart(weeklyActivity: List<Int>) {
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (value > 0) {
-                            if (isHighest) YellowAccent else Color(0xFF00BCD4)
-                        } else TextSecondary
+                            if (isHighest) primaryColor else secondaryColor
+                        } else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -792,7 +811,8 @@ fun AchievementItem(
                 MaterialTheme.colorScheme.surface
             else
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Row(
             modifier = Modifier
@@ -841,12 +861,12 @@ fun AchievementItem(
                     color = if (unlocked)
                         MaterialTheme.colorScheme.onSurface
                     else
-                        TextSecondary
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     description,
                     fontSize = 13.sp,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 

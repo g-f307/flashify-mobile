@@ -1,7 +1,9 @@
 package com.example.flashify.view.ui.screen.principal
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -23,27 +25,38 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.NavItem
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.util.*
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.SettingsViewModel
 import com.example.flashify.viewmodel.UserState
+import kotlinx.coroutines.launch
 
 @Composable
 fun TelaPrincipalConfiguracao(
     navController: NavController,
     settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
-    var notificationsEnabled by remember { mutableStateOf(true) }
-    var darkModeEnabled by remember { mutableStateOf(true) }
-    var soundEnabled by remember { mutableStateOf(false) }
-
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // --- LÓGICA DO TEMA ---
+    val themeManager = remember { ThemeManager(context) }
+    // O switch agora reflete o estado real da app
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+
     val tokenManager = remember { TokenManager(context) }
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
+
+    // Estados locais
+    var notificationsEnabled by remember { mutableStateOf(true) }
+    var soundEnabled by remember { mutableStateOf(false) }
+
+    // Cores do Tema
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     var selectedItem by remember { mutableStateOf(4) }
     val navItems = listOf(
@@ -57,7 +70,6 @@ fun TelaPrincipalConfiguracao(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            // ✅ CORREÇÃO APLICADA: Column com navigationBarsPadding
             Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
                     navItems = navItems,
@@ -65,18 +77,10 @@ fun TelaPrincipalConfiguracao(
                     onItemSelected = { clickedIndex ->
                         selectedItem = clickedIndex
                         when (navItems[clickedIndex].label) {
-                            "Início" -> navController.navigate(MAIN_SCREEN_ROUTE) {
-                                popUpTo(CONFIGURATION_SCREEN_ROUTE) { inclusive = true }
-                            }
-                            "Criar" -> navController.navigate(CREATE_FLASHCARD_ROUTE) {
-                                popUpTo(CONFIGURATION_SCREEN_ROUTE)
-                            }
-                            "Biblioteca" -> navController.navigate(BIBLIOTECA_SCREEN_ROUTE) {
-                                popUpTo(CONFIGURATION_SCREEN_ROUTE)
-                            }
-                            "Progresso" -> navController.navigate(PROGRESSO_SCREEN_ROUTE) {
-                                popUpTo(CONFIGURATION_SCREEN_ROUTE)
-                            }
+                            "Início" -> navController.navigate(MAIN_SCREEN_ROUTE) { popUpTo(CONFIGURATION_SCREEN_ROUTE) { inclusive = true } }
+                            "Criar" -> navController.navigate(CREATE_FLASHCARD_ROUTE) { popUpTo(CONFIGURATION_SCREEN_ROUTE) }
+                            "Biblioteca" -> navController.navigate(BIBLIOTECA_SCREEN_ROUTE) { popUpTo(CONFIGURATION_SCREEN_ROUTE) }
+                            "Progresso" -> navController.navigate(PROGRESSO_SCREEN_ROUTE) { popUpTo(CONFIGURATION_SCREEN_ROUTE) }
                             "Config" -> { /* Já está aqui */ }
                         }
                     }
@@ -84,7 +88,8 @@ fun TelaPrincipalConfiguracao(
             }
         }
     ) { innerPadding ->
-        GradientBackgroundScreen {
+        // ✅ Passamos isDarkTheme para o fundo funcionar corretamente
+        GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -104,7 +109,7 @@ fun TelaPrincipalConfiguracao(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Configurações",
                             modifier = Modifier.size(32.dp),
-                            tint = YellowAccent
+                            tint = primaryColor
                         )
                         Text(
                             text = "Configurações",
@@ -120,9 +125,9 @@ fun TelaPrincipalConfiguracao(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        // ✅ Borda adicionada
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     ) {
                         Box(
                             modifier = Modifier
@@ -132,13 +137,10 @@ fun TelaPrincipalConfiguracao(
                         ) {
                             when (val state = userState) {
                                 is UserState.Loading -> {
-                                    CircularProgressIndicator(color = YellowAccent)
+                                    CircularProgressIndicator(color = primaryColor)
                                 }
                                 is UserState.Error -> {
-                                    Text(
-                                        state.message,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
+                                    Text(state.message, color = MaterialTheme.colorScheme.error)
                                 }
                                 is UserState.Success -> {
                                     val user = state.user
@@ -154,14 +156,14 @@ fun TelaPrincipalConfiguracao(
                                                 modifier = Modifier
                                                     .size(64.dp)
                                                     .clip(CircleShape)
-                                                    .background(YellowAccent.copy(alpha = 0.2f)),
+                                                    .background(primaryColor.copy(alpha = 0.2f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.AccountCircle,
                                                     contentDescription = "Foto de Perfil",
                                                     modifier = Modifier.size(40.dp),
-                                                    tint = YellowAccent
+                                                    tint = primaryColor
                                                 )
                                             }
                                             Column {
@@ -173,7 +175,7 @@ fun TelaPrincipalConfiguracao(
                                                 )
                                                 Text(
                                                     user.email,
-                                                    color = TextSecondary,
+                                                    color = onSurfaceVariant,
                                                     fontSize = 14.sp
                                                 )
                                             }
@@ -182,9 +184,8 @@ fun TelaPrincipalConfiguracao(
                                             onClick = { /* TODO: Editar perfil */ },
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(12.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = YellowAccent
-                                            )
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = primaryColor),
+                                            border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.5f))
                                         ) {
                                             Text("Editar Perfil", fontWeight = FontWeight.Bold)
                                         }
@@ -200,9 +201,9 @@ fun TelaPrincipalConfiguracao(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        // ✅ Borda adicionada
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp),
@@ -221,15 +222,20 @@ fun TelaPrincipalConfiguracao(
                                 checked = notificationsEnabled,
                                 onCheckedChange = { notificationsEnabled = it }
                             )
-                            Divider(color = Color.Gray.copy(alpha = 0.3f))
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            // ✅ Switch de Tema agora funciona!
                             ConfiguracaoSwitchItem(
-                                icon = Icons.Default.DarkMode,
+                                icon = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.WbSunny,
                                 text = "Modo Escuro",
-                                description = "Tema escuro ativado",
-                                checked = darkModeEnabled,
-                                onCheckedChange = { darkModeEnabled = it }
+                                description = if (isDarkTheme) "Tema escuro ativado" else "Tema claro ativado",
+                                checked = isDarkTheme,
+                                onCheckedChange = {
+                                    scope.launch { themeManager.toggleTheme() }
+                                }
                             )
-                            Divider(color = Color.Gray.copy(alpha = 0.3f))
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
                             ConfiguracaoSwitchItem(
                                 icon = Icons.Default.VolumeUp,
                                 text = "Som",
@@ -246,9 +252,9 @@ fun TelaPrincipalConfiguracao(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        // ✅ Borda adicionada
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp),
@@ -265,13 +271,13 @@ fun TelaPrincipalConfiguracao(
                                 text = "Central de Ajuda",
                                 onClick = { /* TODO */ }
                             )
-                            Divider(color = Color.Gray.copy(alpha = 0.3f))
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             ConfiguracaoClickItem(
                                 icon = Icons.Default.Description,
                                 text = "Termos de Uso",
                                 onClick = { /* TODO */ }
                             )
-                            Divider(color = Color.Gray.copy(alpha = 0.3f))
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             ConfiguracaoClickItem(
                                 icon = Icons.Default.Shield,
                                 text = "Política de Privacidade",
@@ -293,8 +299,9 @@ fun TelaPrincipalConfiguracao(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFF44336)
-                        )
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                     ) {
                         Icon(Icons.Default.ExitToApp, null)
                         Spacer(Modifier.width(8.dp))
@@ -307,7 +314,7 @@ fun TelaPrincipalConfiguracao(
                     Text(
                         "Versão 2.0.0",
                         fontSize = 12.sp,
-                        color = TextSecondary,
+                        color = onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -325,6 +332,9 @@ fun ConfiguracaoSwitchItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -339,13 +349,13 @@ fun ConfiguracaoSwitchItem(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(YellowAccent.copy(alpha = 0.2f)),
+                    .background(primaryColor.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = YellowAccent,
+                    tint = primaryColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -358,7 +368,7 @@ fun ConfiguracaoSwitchItem(
                 Text(
                     description,
                     fontSize = 12.sp,
-                    color = TextSecondary
+                    color = onSurfaceVariant
                 )
             }
         }
@@ -366,10 +376,10 @@ fun ConfiguracaoSwitchItem(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.Black,
-                checkedTrackColor = YellowAccent,
-                uncheckedThumbColor = Color.Gray,
-                uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = primaryColor,
+                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
     }
@@ -393,7 +403,7 @@ fun ConfiguracaoClickItem(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(Color.Gray.copy(alpha = 0.2f)),
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -412,7 +422,7 @@ fun ConfiguracaoClickItem(
         Icon(
             Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = TextSecondary
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

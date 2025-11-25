@@ -2,8 +2,10 @@ package com.example.flashify.view.ui.screen.principal
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -24,10 +27,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.FlashcardResponse
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.view.ui.components.EditFlashcardDialog
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.FlashcardEditState
 import com.example.flashify.viewmodel.StudyState
@@ -42,6 +44,12 @@ fun TelaEstudo(
     viewModel: StudyViewModel = hiltViewModel(),
     deckViewModel: DeckViewModel = hiltViewModel()
 ) {
+    // --- LÓGICA DO TEMA ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     val uiState by viewModel.studyState.collectAsStateWithLifecycle()
     var elapsedTime by remember { mutableStateOf(0) }
     var isTimerRunning by remember { mutableStateOf(true) }
@@ -57,7 +65,8 @@ fun TelaEstudo(
         }
     }
 
-    GradientBackgroundScreen {
+    // ✅ Passamos isDarkTheme para o gradiente
+    GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
@@ -72,7 +81,7 @@ fun TelaEstudo(
                             Text(
                                 formatTime(elapsedTime),
                                 fontSize = 12.sp,
-                                color = YellowAccent
+                                color = primaryColor
                             )
                         }
                     },
@@ -102,7 +111,7 @@ fun TelaEstudo(
                 contentAlignment = Alignment.Center
             ) {
                 when (val state = uiState) {
-                    is StudyState.Loading -> CircularProgressIndicator(color = YellowAccent)
+                    is StudyState.Loading -> CircularProgressIndicator(color = primaryColor)
                     is StudyState.Error -> {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -117,8 +126,8 @@ fun TelaEstudo(
                             Button(
                                 onClick = { navController.popBackStack() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = YellowAccent,
-                                    contentColor = Color.Black
+                                    containerColor = primaryColor,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             ) {
                                 Text("Voltar")
@@ -161,11 +170,11 @@ fun StudySession(
     var cardsIncorrect by remember { mutableStateOf(0) }
     var isSessionFinished by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
-
-    // ✅ NOVO: State para forçar reload dos flashcards
     var shouldReloadFlashcards by remember { mutableStateOf(false) }
 
     val editState by viewModel.editState.collectAsStateWithLifecycle()
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     LaunchedEffect(editState) {
         if (editState is FlashcardEditState.Success) {
@@ -174,7 +183,6 @@ fun StudySession(
         }
     }
 
-    // ✅ NOVO: Quando shouldReloadFlashcards muda para true, busca novos flashcards
     LaunchedEffect(shouldReloadFlashcards) {
         if (shouldReloadFlashcards) {
             viewModel.fetchFlashcards(deckId)
@@ -189,10 +197,7 @@ fun StudySession(
             knownCards = cardsCorrect,
             learningCards = cardsIncorrect,
             onRestart = {
-                // ✅ MODIFICADO: Recarrega flashcards ANTES de reiniciar
                 shouldReloadFlashcards = true
-
-                // Reseta os contadores locais
                 currentCardIndex = 0
                 cardsCorrect = 0
                 cardsIncorrect = 0
@@ -208,13 +213,14 @@ fun StudySession(
     if (flashcards.isEmpty()) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
         ) {
             Column(
                 modifier = Modifier.padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.Info, null, tint = YellowAccent, modifier = Modifier.size(64.dp))
+                Icon(Icons.Default.Info, null, tint = primaryColor, modifier = Modifier.size(64.dp))
                 Spacer(Modifier.height(16.dp))
                 Text("Este deck não contém flashcards.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
             }
@@ -278,24 +284,24 @@ fun StudySession(
             ) {
                 Text(
                     "${currentCardIndex + 1}/${flashcards.size}",
-                    color = YellowAccent,
+                    color = primaryColor,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     "${(progress * 100).toInt()}% concluído",
-                    color = TextSecondary,
+                    color = secondaryColor,
                     fontSize = 14.sp
                 )
             }
             Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
-                progress = progress,
+                progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
-                color = YellowAccent,
-                trackColor = Color.Gray.copy(alpha = 0.3f)
+                color = primaryColor,
+                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             )
         }
 
@@ -341,8 +347,8 @@ fun StudySession(
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = YellowAccent,
-                    contentColor = Color.Black
+                    containerColor = primaryColor,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -363,6 +369,7 @@ fun StudySession(
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = Color(0xFFF44336)
                     ),
+                    border = BorderStroke(1.dp, Color(0xFFF44336).copy(alpha = 0.5f)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(Icons.Default.Close, null)
@@ -399,6 +406,11 @@ fun FlashcardView(
     onFlip: () -> Unit = {},
     onEdit: () -> Unit = {}
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val isDarkTheme = isSystemInDarkTheme()
+    // Cor ciano para a resposta, adaptada ao tema
+    val answerColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -412,7 +424,9 @@ fun FlashcardView(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        // ✅ Borda adicionada
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Box(
             modifier = Modifier
@@ -429,7 +443,7 @@ fun FlashcardView(
                 Icon(
                     Icons.Default.Edit,
                     contentDescription = "Editar flashcard",
-                    tint = YellowAccent,
+                    tint = primaryColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -447,7 +461,7 @@ fun FlashcardView(
                         Text(
                             "Pergunta",
                             fontSize = 14.sp,
-                            color = YellowAccent,
+                            color = primaryColor,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.height(16.dp))
@@ -469,7 +483,7 @@ fun FlashcardView(
                         Text(
                             "Resposta",
                             fontSize = 14.sp,
-                            color = Color(0xFF00BCD4),
+                            color = answerColor,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.height(16.dp))
@@ -494,9 +508,13 @@ fun StatBadge(
     label: String,
     color: Color
 ) {
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.2f))
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
+        // ✅ Borda adicionada (com a cor do status, ex: verde ou vermelho)
+        border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -507,14 +525,14 @@ fun StatBadge(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(color.copy(alpha = 0.3f)),
+                    .background(color.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
             }
             Column {
                 Text("$value", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
-                Text(label, fontSize = 12.sp, color = TextSecondary)
+                Text(label, fontSize = 12.sp, color = secondaryColor)
             }
         }
     }

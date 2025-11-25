@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,12 +31,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.NavItem
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.*
 import com.example.flashify.view.ui.components.GenerationLimitBar
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.DeckCreationState
 import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.GenerationLimitState
@@ -47,6 +47,15 @@ fun TelaCriacaoFlashCard(
     viewModel: DeckViewModel = hiltViewModel(),
     folderId: Int? = null
 ) {
+    // --- LÓGICA DO TEMA ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+
+    // Cores do Tema
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     var currentStep by remember { mutableStateOf(1) }
     var deckName by remember { mutableStateOf("") }
     var contentText by remember { mutableStateOf("") }
@@ -61,7 +70,6 @@ fun TelaCriacaoFlashCard(
 
     val creationState by viewModel.deckCreationState.collectAsStateWithLifecycle()
     val generationLimitState by viewModel.generationLimitState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     // ✅ Verificar limite ao entrar na tela
     LaunchedEffect(Unit) {
@@ -115,7 +123,6 @@ fun TelaCriacaoFlashCard(
             )
             val selectedItemIndex = 2
 
-            // ✅ CORREÇÃO APLICADA: Column com navigationBarsPadding
             Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
                     navItems = navItems,
@@ -141,7 +148,8 @@ fun TelaCriacaoFlashCard(
             }
         }
     ) { innerPadding ->
-        GradientBackgroundScreen {
+        // ✅ Passamos isDarkTheme para o gradiente
+        GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -157,13 +165,13 @@ fun TelaCriacaoFlashCard(
                     modifier = Modifier
                         .size(64.dp)
                         .shadow(8.dp, CircleShape)
-                        .background(YellowAccent.copy(alpha = 0.2f), CircleShape),
+                        .background(primaryColor.copy(alpha = 0.2f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -197,8 +205,8 @@ fun TelaCriacaoFlashCard(
                                     .width(24.dp)
                                     .height(2.dp)
                                     .background(
-                                        if (step < currentStep) YellowAccent
-                                        else Color.Gray.copy(alpha = 0.3f),
+                                        if (step < currentStep) primaryColor
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                                         RoundedCornerShape(1.dp)
                                     )
                             )
@@ -210,7 +218,7 @@ fun TelaCriacaoFlashCard(
 
                 Text(
                     text = getStepTitle(currentStep),
-                    color = TextSecondary,
+                    color = onSurfaceVariant,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 0.2.sp
@@ -225,8 +233,8 @@ fun TelaCriacaoFlashCard(
                         .fillMaxWidth()
                         .height(8.dp)
                         .clip(RoundedCornerShape(4.dp)),
-                    color = YellowAccent,
-                    trackColor = Color.Gray.copy(alpha = 0.2f),
+                    color = primaryColor,
+                    trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -260,7 +268,6 @@ fun TelaCriacaoFlashCard(
                             onDifficultyChange = { difficulty = it }
                         )
 
-                        // ✅ MOSTRAR BARRA DE LIMITE NO ÚLTIMO PASSO
                         Spacer(modifier = Modifier.height(24.dp))
                         if (generationLimitState is GenerationLimitState.Success) {
                             val info = (generationLimitState as GenerationLimitState.Success).info
@@ -271,7 +278,7 @@ fun TelaCriacaoFlashCard(
                             )
                         } else if (generationLimitState is GenerationLimitState.Loading) {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = YellowAccent)
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = primaryColor)
                             }
                         }
                     }
@@ -291,18 +298,20 @@ fun TelaCriacaoFlashCard(
                                 .weight(1f)
                                 .height(52.dp),
                             shape = RoundedCornerShape(14.dp),
-                            border = BorderStroke(1.5.dp, YellowAccent)
+                            border = BorderStroke(1.5.dp, primaryColor),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = primaryColor
+                            )
                         ) {
                             Icon(
                                 Icons.Default.ArrowBack,
                                 null,
-                                tint = YellowAccent,
+                                tint = primaryColor,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 "Voltar",
-                                color = YellowAccent,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 15.sp,
                                 letterSpacing = 0.3.sp
@@ -342,18 +351,17 @@ fun TelaCriacaoFlashCard(
                             .weight(1f)
                             .height(52.dp)
                             .shadow(6.dp, RoundedCornerShape(14.dp)),
-                        // ✅ DESABILITAR BOTÃO SE LIMITE ATINGIDO
                         enabled = isNextEnabled && creationState !is DeckCreationState.Loading && (!isLimitReached || currentStep < 4),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isLimitReached && currentStep == 4) Color.Gray else YellowAccent,
-                            contentColor = Color.Black
+                            containerColor = if (isLimitReached && currentStep == 4) Color.Gray else primaryColor,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         if (creationState is DeckCreationState.Loading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
-                                color = Color.Black,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 strokeWidth = 2.5.dp
                             )
                         } else {
@@ -379,23 +387,23 @@ fun TelaCriacaoFlashCard(
     }
 }
 
-// Os outros componentes (StepIndicator, StepDeckName, StepContent, StepQuantity, StepOptions, etc.)
-// mantêm-se exatamente como no código original que você enviou e devem ser colados aqui.
-// Vou omiti-los para brevidade, mas eles são essenciais.
 @Composable
 fun StepIndicator(
     stepNumber: Int,
     currentStep: Int,
     isCompleted: Boolean
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val outlineColor = MaterialTheme.colorScheme.outline
+
     Box(
         modifier = Modifier
             .size(36.dp)
             .background(
                 when {
-                    isCompleted -> YellowAccent
-                    stepNumber == currentStep -> YellowAccent.copy(alpha = 0.3f)
-                    else -> Color.Gray.copy(alpha = 0.2f)
+                    isCompleted -> primaryColor
+                    stepNumber == currentStep -> primaryColor.copy(alpha = 0.3f)
+                    else -> outlineColor.copy(alpha = 0.2f)
                 },
                 CircleShape
             )
@@ -410,7 +418,7 @@ fun StepIndicator(
             Icon(
                 Icons.Default.Check,
                 contentDescription = null,
-                tint = Color.Black,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(20.dp)
             )
         } else {
@@ -418,7 +426,7 @@ fun StepIndicator(
                 stepNumber.toString(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
-                color = if (stepNumber == currentStep) YellowAccent else Color.Gray
+                color = if (stepNumber == currentStep) primaryColor else outlineColor
             )
         }
     }
@@ -439,6 +447,8 @@ fun StepDeckName(
     deckName: String,
     onDeckNameChange: (String) -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -446,19 +456,20 @@ fun StepDeckName(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .background(YellowAccent.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
+                    .background(primaryColor.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.DriveFileRenameOutline,
                     contentDescription = null,
-                    tint = YellowAccent,
+                    tint = primaryColor,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -474,7 +485,7 @@ fun StepDeckName(
             Text(
                 "Escolha um nome descritivo e memorável para seu deck de estudos",
                 fontSize = 14.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 20.sp,
                 letterSpacing = 0.2.sp
             )
@@ -488,15 +499,15 @@ fun StepDeckName(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = YellowAccent,
-                    focusedLabelColor = YellowAccent,
-                    cursorColor = YellowAccent
+                    focusedBorderColor = primaryColor,
+                    focusedLabelColor = primaryColor,
+                    cursorColor = primaryColor
                 ),
                 leadingIcon = {
                     Icon(
                         Icons.Default.Edit,
                         contentDescription = null,
-                        tint = if (deckName.isNotEmpty()) YellowAccent else Color.Gray,
+                        tint = if (deckName.isNotEmpty()) primaryColor else Color.Gray,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -509,7 +520,7 @@ fun StepDeckName(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            YellowAccent.copy(alpha = 0.1f),
+                            primaryColor.copy(alpha = 0.1f),
                             RoundedCornerShape(8.dp)
                         )
                         .padding(12.dp)
@@ -517,7 +528,7 @@ fun StepDeckName(
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -543,6 +554,7 @@ fun StepContent(
     onFileSelected: (Uri?) -> Unit,
     context: Context
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -556,19 +568,20 @@ fun StepContent(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .background(YellowAccent.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
+                    .background(primaryColor.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Description,
                     contentDescription = null,
-                    tint = YellowAccent,
+                    tint = primaryColor,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -584,13 +597,12 @@ fun StepContent(
             Text(
                 "Escolha como fornecer o conteúdo para gerar os flashcards",
                 fontSize = 14.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 20.sp,
                 letterSpacing = 0.2.sp
             )
             Spacer(Modifier.height(24.dp))
 
-            // Mode selection
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -625,9 +637,9 @@ fun StepContent(
                     maxLines = 12,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = YellowAccent,
-                        focusedLabelColor = YellowAccent,
-                        cursorColor = YellowAccent
+                        focusedBorderColor = primaryColor,
+                        focusedLabelColor = primaryColor,
+                        cursorColor = primaryColor
                     )
                 )
                 if (contentText.isNotEmpty()) {
@@ -639,14 +651,14 @@ fun StepContent(
                         Icon(
                             Icons.Default.Info,
                             contentDescription = null,
-                            tint = TextSecondary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
                             "${contentText.length} caracteres • ${contentText.split("\\s+".toRegex()).size} palavras",
                             fontSize = 12.sp,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -656,9 +668,9 @@ fun StepContent(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = YellowAccent.copy(alpha = 0.1f)
+                            containerColor = primaryColor.copy(alpha = 0.1f)
                         ),
-                        border = BorderStroke(1.dp, YellowAccent.copy(alpha = 0.3f))
+                        border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.3f))
                     ) {
                         Row(
                             modifier = Modifier
@@ -669,13 +681,13 @@ fun StepContent(
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .background(YellowAccent.copy(alpha = 0.2f), RoundedCornerShape(10.dp)),
+                                    .background(primaryColor.copy(alpha = 0.2f), RoundedCornerShape(10.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Default.Description,
                                     contentDescription = null,
-                                    tint = YellowAccent,
+                                    tint = primaryColor,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -690,7 +702,7 @@ fun StepContent(
                                 Text(
                                     selectedFileUri.lastPathSegment ?: "arquivo.pdf",
                                     fontSize = 13.sp,
-                                    color = TextSecondary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
                                 )
                             }
@@ -701,7 +713,7 @@ fun StepContent(
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Remover",
-                                    tint = Color.Gray,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -716,19 +728,21 @@ fun StepContent(
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(),
-                    border = BorderStroke(1.5.dp, YellowAccent)
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = primaryColor
+                    ),
+                    border = BorderStroke(1.5.dp, primaryColor)
                 ) {
                     Icon(
                         Icons.Default.UploadFile,
                         null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
                         if (selectedFileUri == null) "Selecionar Arquivo" else "Trocar Arquivo",
-                        color = YellowAccent,
+                        color = primaryColor,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp
                     )
@@ -743,6 +757,8 @@ fun StepQuantity(
     flashcardQuantity: Float,
     onQuantityChange: (Float) -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -750,19 +766,20 @@ fun StepQuantity(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .background(YellowAccent.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
+                    .background(primaryColor.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Numbers,
                     contentDescription = null,
-                    tint = YellowAccent,
+                    tint = primaryColor,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -778,7 +795,7 @@ fun StepQuantity(
             Text(
                 "Quantos flashcards deseja gerar a partir do conteúdo?",
                 fontSize = 14.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 20.sp,
                 letterSpacing = 0.2.sp
             )
@@ -787,7 +804,7 @@ fun StepQuantity(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(YellowAccent.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                    .background(primaryColor.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -796,13 +813,13 @@ fun StepQuantity(
                         "${flashcardQuantity.roundToInt()}",
                         fontSize = 56.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = YellowAccent,
+                        color = primaryColor,
                         letterSpacing = 1.sp
                     )
                     Text(
                         "flashcards",
                         fontSize = 16.sp,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -817,8 +834,8 @@ fun StepQuantity(
                 steps = 14,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    thumbColor = YellowAccent,
-                    activeTrackColor = YellowAccent,
+                    thumbColor = primaryColor,
+                    activeTrackColor = primaryColor,
                     inactiveTrackColor = Color.Gray.copy(alpha = 0.2f)
                 )
             )
@@ -829,13 +846,13 @@ fun StepQuantity(
             ) {
                 Text(
                     "5 mínimo",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
                     "20 máximo",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -856,14 +873,14 @@ fun StepQuantity(
                 Icon(
                     Icons.Default.Lightbulb,
                     contentDescription = null,
-                    tint = YellowAccent,
+                    tint = primaryColor,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "Recomendamos 10-20 flashcards para melhor retenção",
                     fontSize = 12.sp,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
                 )
             }
@@ -880,6 +897,8 @@ fun StepOptions(
     difficulty: String,
     onDifficultyChange: (String) -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -887,19 +906,20 @@ fun StepOptions(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .background(YellowAccent.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
+                    .background(primaryColor.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Settings,
                     contentDescription = null,
-                    tint = YellowAccent,
+                    tint = primaryColor,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -915,7 +935,7 @@ fun StepOptions(
             Text(
                 "Configure recursos extras para enriquecer seu aprendizado",
                 fontSize = 14.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 20.sp,
                 letterSpacing = 0.2.sp
             )
@@ -928,13 +948,13 @@ fun StepOptions(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (includeQuiz)
-                        YellowAccent.copy(alpha = 0.15f)
+                        primaryColor.copy(alpha = 0.15f)
                     else
                         MaterialTheme.colorScheme.background.copy(alpha = 0.5f)
                 ),
                 border = BorderStroke(
                     width = 2.dp,
-                    color = if (includeQuiz) YellowAccent else Color.Gray.copy(alpha = 0.3f)
+                    color = if (includeQuiz) primaryColor else Color.Gray.copy(alpha = 0.3f)
                 )
             ) {
                 Row(
@@ -948,7 +968,7 @@ fun StepOptions(
                             .size(64.dp)
                             .background(
                                 if (includeQuiz)
-                                    YellowAccent.copy(alpha = 0.25f)
+                                    primaryColor.copy(alpha = 0.25f)
                                 else
                                     Color.Gray.copy(alpha = 0.15f),
                                 RoundedCornerShape(14.dp)
@@ -958,7 +978,7 @@ fun StepOptions(
                         Icon(
                             Icons.Default.Quiz,
                             contentDescription = null,
-                            tint = if (includeQuiz) YellowAccent else Color.Gray,
+                            tint = if (includeQuiz) primaryColor else Color.Gray,
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -977,7 +997,7 @@ fun StepOptions(
                         Text(
                             "Gerar perguntas de múltipla escolha",
                             fontSize = 14.sp,
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 18.sp
                         )
                     }
@@ -988,16 +1008,15 @@ fun StepOptions(
                         checked = includeQuiz,
                         onCheckedChange = onIncludeQuizChange,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.Black,
-                            checkedTrackColor = YellowAccent,
-                            uncheckedThumbColor = Color.Gray,
-                            uncheckedTrackColor = Color.Gray.copy(alpha = 0.3f)
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = primaryColor,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 }
             }
 
-            // ✅ SEÇÃO DE CUSTOMIZAÇÃO DO QUIZ (APARECE QUANDO includeQuiz É TRUE)
             if (includeQuiz) {
                 Spacer(Modifier.height(24.dp))
 
@@ -1006,7 +1025,7 @@ fun StepOptions(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            YellowAccent.copy(alpha = 0.05f),
+                            primaryColor.copy(alpha = 0.05f),
                             RoundedCornerShape(16.dp)
                         )
                         .padding(20.dp)
@@ -1020,7 +1039,7 @@ fun StepOptions(
                             Icon(
                                 Icons.Default.Numbers,
                                 contentDescription = null,
-                                tint = YellowAccent,
+                                tint = primaryColor,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(Modifier.width(10.dp))
@@ -1035,7 +1054,7 @@ fun StepOptions(
                             "${quizQuantity.roundToInt()}",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = YellowAccent
+                            color = primaryColor
                         )
                     }
 
@@ -1048,8 +1067,8 @@ fun StepOptions(
                         steps = 11,
                         modifier = Modifier.fillMaxWidth(),
                         colors = SliderDefaults.colors(
-                            thumbColor = YellowAccent,
-                            activeTrackColor = YellowAccent,
+                            thumbColor = primaryColor,
+                            activeTrackColor = primaryColor,
                             inactiveTrackColor = Color.Gray.copy(alpha = 0.2f)
                         )
                     )
@@ -1060,13 +1079,13 @@ fun StepOptions(
                     ) {
                         Text(
                             "3 mínimo",
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
                             "15 máximo",
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -1080,7 +1099,7 @@ fun StepOptions(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            YellowAccent.copy(alpha = 0.05f),
+                            primaryColor.copy(alpha = 0.05f),
                             RoundedCornerShape(16.dp)
                         )
                         .padding(20.dp)
@@ -1089,7 +1108,7 @@ fun StepOptions(
                         Icon(
                             Icons.Default.TrendingUp,
                             contentDescription = null,
-                            tint = YellowAccent,
+                            tint = primaryColor,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(Modifier.width(10.dp))
@@ -1137,7 +1156,7 @@ fun StepOptions(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            YellowAccent.copy(alpha = 0.1f),
+                            primaryColor.copy(alpha = 0.1f),
                             RoundedCornerShape(10.dp)
                         )
                         .padding(14.dp),
@@ -1146,7 +1165,7 @@ fun StepOptions(
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(Modifier.width(10.dp))
@@ -1161,11 +1180,14 @@ fun StepOptions(
             } else {
                 Spacer(Modifier.height(16.dp))
 
+                val isDarkTheme = isSystemInDarkTheme()
+                val infoColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            Color(0xFF00BCD4).copy(alpha = 0.1f),
+                            infoColor.copy(alpha = 0.1f),
                             RoundedCornerShape(10.dp)
                         )
                         .padding(14.dp),
@@ -1174,14 +1196,14 @@ fun StepOptions(
                     Icon(
                         Icons.Default.Lightbulb,
                         contentDescription = null,
-                        tint = Color(0xFF00BCD4),
+                        tint = infoColor,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         "O quiz será gerado automaticamente com base no conteúdo dos flashcards, perfeito para testar seu conhecimento!",
                         fontSize = 13.sp,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp,
                         letterSpacing = 0.2.sp
                     )
@@ -1199,6 +1221,8 @@ fun ModeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
         onClick = onClick,
         modifier = modifier
@@ -1211,13 +1235,13 @@ fun ModeButton(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (selected)
-                YellowAccent.copy(alpha = 0.15f)
+                primaryColor.copy(alpha = 0.15f)
             else
                 MaterialTheme.colorScheme.background.copy(alpha = 0.5f)
         ),
         border = BorderStroke(
             width = 2.dp,
-            color = if (selected) YellowAccent else Color.Gray.copy(alpha = 0.3f)
+            color = if (selected) primaryColor else Color.Gray.copy(alpha = 0.3f)
         )
     ) {
         Column(
@@ -1231,7 +1255,7 @@ fun ModeButton(
                 modifier = Modifier
                     .size(48.dp)
                     .background(
-                        if (selected) YellowAccent.copy(alpha = 0.25f)
+                        if (selected) primaryColor.copy(alpha = 0.25f)
                         else Color.Gray.copy(alpha = 0.15f),
                         RoundedCornerShape(12.dp)
                     ),
@@ -1240,7 +1264,7 @@ fun ModeButton(
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = if (selected) YellowAccent else Color.Gray,
+                    tint = if (selected) primaryColor else Color.Gray,
                     modifier = Modifier.size(26.dp)
                 )
             }
@@ -1252,14 +1276,13 @@ fun ModeButton(
                 color = if (selected)
                     MaterialTheme.colorScheme.onSurface
                 else
-                    TextSecondary,
+                    MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 0.3.sp
             )
         }
     }
 }
 
-// ✅ NOVO COMPOSABLE PARA BOTÕES DE DIFICULDADE
 @Composable
 fun DifficultyButton(
     label: String,
@@ -1268,19 +1291,21 @@ fun DifficultyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
         onClick = onClick,
         modifier = modifier.height(80.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (selected)
-                YellowAccent.copy(alpha = 0.2f)
+                primaryColor.copy(alpha = 0.2f)
             else
                 MaterialTheme.colorScheme.background.copy(alpha = 0.5f)
         ),
         border = BorderStroke(
             width = 2.dp,
-            color = if (selected) YellowAccent else Color.Gray.copy(alpha = 0.3f)
+            color = if (selected) primaryColor else Color.Gray.copy(alpha = 0.3f)
         )
     ) {
         Column(
@@ -1293,7 +1318,7 @@ fun DifficultyButton(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = if (selected) YellowAccent else Color.Gray,
+                tint = if (selected) primaryColor else Color.Gray,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(Modifier.height(6.dp))
@@ -1304,7 +1329,7 @@ fun DifficultyButton(
                 color = if (selected)
                     MaterialTheme.colorScheme.onSurface
                 else
-                    TextSecondary
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

@@ -1,7 +1,6 @@
 package com.example.flashify.view.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -11,29 +10,30 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 @Composable
-fun GradientBackgroundScreen(content: @Composable () -> Unit) {
-    val isDarkTheme = isSystemInDarkTheme()
-
-    // Define o brush do gradiente para TEMA CLARO (inspirado na web)
+fun GradientBackgroundScreen(
+    isDarkTheme: Boolean,
+    content: @Composable () -> Unit
+) {
+    // Gradiente EXTREMAMENTE suave (Quase imperceptível)
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFFFFF7DC), // Amarelo pálido (topo)
-            Color(0xFFFFFBF0), // Amarelo ainda mais claro (meio)
-            Color(0xFFFFFFFF)  // Branco (fundo)
-        ),
-        startY = 0f,
-        endY = 1500f // Transição mais suave
+            // Topo: Um tom "creme" muito pálido (Light Yellow 50)
+            // Dá apenas um toque de calor ao topo da tela
+            Color(0xFFFFFDE7),
+
+            // Fundo: Branco puro
+            // O gradiente funde-se completamente com o branco antes de chegar ao meio
+            Color(0xFFFFFFFF)
+        )
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .then(
-                // Aplica o gradiente SOMENTE se for tema claro
                 if (!isDarkTheme) {
                     Modifier.background(gradientBrush)
                 } else {
-                    // Se for tema escuro, usa o fundo padrão do tema escuro
                     Modifier.background(MaterialTheme.colorScheme.background)
                 }
             )

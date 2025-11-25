@@ -2,7 +2,9 @@ package com.example.flashify.view.ui.screen.principal
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +21,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -26,15 +29,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.ESTUDO_SCREEN_ROUTE
 import com.example.flashify.model.util.QUIZ_SCREEN_ROUTE
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
-import com.example.flashify.viewmodel.DeckViewModel
+import com.example.flashify.viewmodel.DeckActionState
 import com.example.flashify.viewmodel.DeckListState
 import com.example.flashify.viewmodel.DeckStatsState
-import com.example.flashify.viewmodel.DeckActionState
+import com.example.flashify.viewmodel.DeckViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -43,8 +45,17 @@ import kotlinx.coroutines.launch
 fun TelaEscolhaModoEstudo(
     navController: NavController,
     deckId: Int,
-    deckViewModel: DeckViewModel = hiltViewModel() // ✅ Atualizado
+    deckViewModel: DeckViewModel = hiltViewModel()
 ) {
+    // --- LÓGICA DO TEMA ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+
+    // Cores do Tema
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
     val statsState by deckViewModel.deckStatsState.collectAsStateWithLifecycle()
     val actionState by deckViewModel.deckActionState.collectAsStateWithLifecycle()
@@ -55,10 +66,6 @@ fun TelaEscolhaModoEstudo(
     // Estados separados para controlar o loading de cada card
     var isCreatingFlashcards by remember { mutableStateOf(false) }
     var isCreatingQuiz by remember { mutableStateOf(false) }
-
-    // Guarda o estado anterior para detectar mudanças
-    var previousHasQuiz by remember { mutableStateOf(deck?.hasQuiz ?: false) }
-    var previousFlashcardsTotal by remember { mutableStateOf(0) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -83,15 +90,7 @@ fun TelaEscolhaModoEstudo(
             deckViewModel.fetchDecks()
         }
 
-        delay(1000)
-        deck?.let {
-            previousHasQuiz = it.hasQuiz
-        }
-
         val currentStatsState = deckViewModel.deckStatsState.value
-        if (currentStatsState is DeckStatsState.Success) {
-            previousFlashcardsTotal = currentStatsState.stats.flashcards.total
-        }
     }
 
     LaunchedEffect(shouldRefresh) {
@@ -110,7 +109,6 @@ fun TelaEscolhaModoEstudo(
                 if (isCreatingQuiz && updatedDeck.hasQuiz) {
                     isCreatingQuiz = false
                 }
-                previousHasQuiz = updatedDeck.hasQuiz
                 deck = updatedDeck
             }
         }
@@ -123,7 +121,6 @@ fun TelaEscolhaModoEstudo(
                 if (isCreatingFlashcards && flashcardsTotal > 0) {
                     isCreatingFlashcards = false
                 }
-                previousFlashcardsTotal = flashcardsTotal
             }
             else -> {}
         }
@@ -170,7 +167,8 @@ fun TelaEscolhaModoEstudo(
         }
     }
 
-    GradientBackgroundScreen {
+    // ✅ Passamos isDarkTheme para o gradiente
+    GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = {
@@ -179,8 +177,8 @@ fun TelaEscolhaModoEstudo(
                     snackbar = { snackbarData ->
                         Snackbar(
                             snackbarData = snackbarData,
-                            containerColor = YellowAccent,
-                            contentColor = Color.Black,
+                            containerColor = primaryColor,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.padding(16.dp)
                         )
@@ -197,12 +195,12 @@ fun TelaEscolhaModoEstudo(
                                 .padding(8.dp)
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
                         ) {
                             Icon(
                                 Icons.Default.ArrowBack,
                                 contentDescription = "Voltar",
-                                tint = MaterialTheme.colorScheme.onBackground
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     },
@@ -220,7 +218,7 @@ fun TelaEscolhaModoEstudo(
                 when {
                     (deckState is DeckListState.Loading || statsState is DeckStatsState.Loading) && deck == null -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = YellowAccent)
+                            CircularProgressIndicator(color = primaryColor)
                         }
                     }
                     deckState is DeckListState.Error -> {
@@ -271,6 +269,11 @@ fun MainContent(
     onCreateFlashcards: () -> Unit,
     onCreateQuiz: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val isDarkTheme = isSystemInDarkTheme()
+    val quizColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
+
     val quizAttempts = stats?.quiz?.totalAttempts ?: 0
     val quizAverageScore = stats?.quiz?.averageScore ?: 0f
     val quizLastScore = stats?.quiz?.lastScore ?: 0f
@@ -296,8 +299,8 @@ fun MainContent(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            YellowAccent.copy(alpha = 0.3f),
-                            YellowAccent.copy(alpha = 0.15f)
+                            primaryColor.copy(alpha = 0.3f),
+                            primaryColor.copy(alpha = 0.15f)
                         )
                     ),
                     shape = CircleShape
@@ -307,7 +310,7 @@ fun MainContent(
             Icon(
                 Icons.Default.LibraryBooks,
                 contentDescription = null,
-                tint = YellowAccent,
+                tint = primaryColor,
                 modifier = Modifier.size(40.dp)
             )
         }
@@ -328,7 +331,7 @@ fun MainContent(
         Text(
             text = "Escolha sua atividade de estudo para este deck",
             fontSize = 15.sp,
-            color = TextSecondary,
+            color = onSurfaceVariant,
             textAlign = TextAlign.Center,
             lineHeight = 22.sp
         )
@@ -340,8 +343,8 @@ fun MainContent(
             icon = Icons.Default.Style,
             title = "Flashcards",
             description = "Veja e revise flashcards, otimizando seu aprendizado.",
-            gradient = listOf(YellowAccent, YellowAccent.copy(alpha = 0.8f)),
-            iconBackground = YellowAccent.copy(alpha = 0.2f),
+            gradient = listOf(primaryColor, primaryColor.copy(alpha = 0.8f)),
+            iconBackground = primaryColor.copy(alpha = 0.2f),
             onClick = {
                 navController.navigate("$ESTUDO_SCREEN_ROUTE/$deckId")
             },
@@ -359,8 +362,8 @@ fun MainContent(
             icon = Icons.Default.Quiz,
             title = "Quiz",
             description = "Teste os seus conhecimentos com perguntas de múltipla escolha geradas pela IA.",
-            gradient = listOf(Color(0xFF00BCD4), Color(0xFF0097A7)),
-            iconBackground = Color(0xFF00BCD4).copy(alpha = 0.2f),
+            gradient = listOf(quizColor, quizColor.copy(alpha = 0.8f)),
+            iconBackground = quizColor.copy(alpha = 0.2f),
             onClick = {
                 navController.navigate("$QUIZ_SCREEN_ROUTE/$deckId")
             },
@@ -381,7 +384,9 @@ fun MainContent(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
-            )
+            ),
+            // ✅ Borda adicionada
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
         ) {
             Column(
                 modifier = Modifier.padding(24.dp)
@@ -393,7 +398,7 @@ fun MainContent(
                     Icon(
                         Icons.Default.BarChart,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -410,7 +415,7 @@ fun MainContent(
                 Text(
                     "Visão Geral",
                     fontSize = 13.sp,
-                    color = TextSecondary
+                    color = onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -432,7 +437,7 @@ fun MainContent(
                             "${flashcardProgress.toInt()}%",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = YellowAccent
+                            color = primaryColor
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Box(
@@ -442,8 +447,8 @@ fun MainContent(
                                 .background(
                                     brush = Brush.verticalGradient(
                                         colors = listOf(
-                                            YellowAccent,
-                                            YellowAccent.copy(alpha = 0.7f)
+                                            primaryColor,
+                                            primaryColor.copy(alpha = 0.7f)
                                         )
                                     ),
                                     shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
@@ -453,7 +458,7 @@ fun MainContent(
                         Text(
                             "Flashcards",
                             fontSize = 13.sp,
-                            color = TextSecondary,
+                            color = onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -476,7 +481,7 @@ fun MainContent(
                                 displayScore,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00BCD4)
+                                color = quizColor
                             )
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -494,8 +499,8 @@ fun MainContent(
                                         brush = Brush.verticalGradient(
                                             colors = if (hasQuizStats) {
                                                 listOf(
-                                                    Color(0xFF00BCD4),
-                                                    Color(0xFF00BCD4).copy(alpha = 0.7f)
+                                                    quizColor,
+                                                    quizColor.copy(alpha = 0.7f)
                                                 )
                                             } else {
                                                 listOf(
@@ -511,7 +516,7 @@ fun MainContent(
                             Text(
                                 if (hasQuizStats) "Quiz (Média)" else "Quiz",
                                 fontSize = 13.sp,
-                                color = TextSecondary,
+                                color = onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -555,12 +560,12 @@ fun MainContent(
                         Text(
                             "Progresso",
                             fontSize = 13.sp,
-                            color = TextSecondary
+                            color = onSurfaceVariant
                         )
                         Text(
                             "${flashcardProgress.toInt()}% de acerto",
                             fontSize = 13.sp,
-                            color = YellowAccent,
+                            color = primaryColor,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -571,7 +576,7 @@ fun MainContent(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp)),
-                        color = YellowAccent,
+                        color = primaryColor,
                         trackColor = Color.Gray.copy(alpha = 0.2f)
                     )
                 }
@@ -600,7 +605,7 @@ fun MainContent(
                                 Text(
                                     "Última pontuação",
                                     fontSize = 13.sp,
-                                    color = TextSecondary
+                                    color = onSurfaceVariant
                                 )
                                 Text(
                                     "${quizLastScore.toInt()}%",
@@ -613,7 +618,7 @@ fun MainContent(
                                 Text(
                                     "Média",
                                     fontSize = 13.sp,
-                                    color = TextSecondary
+                                    color = onSurfaceVariant
                                 )
                                 Text(
                                     "${quizAverageScore.toInt()}%",
@@ -630,7 +635,7 @@ fun MainContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(
-                                    Color(0xFF00BCD4).copy(alpha = 0.1f),
+                                    quizColor.copy(alpha = 0.1f),
                                     RoundedCornerShape(8.dp)
                                 )
                                 .padding(12.dp),
@@ -639,14 +644,14 @@ fun MainContent(
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
-                                tint = Color(0xFF00BCD4),
+                                tint = quizColor,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 "$quizAttempts tentativa${if (quizAttempts > 1) "s" else ""}",
                                 fontSize = 12.sp,
-                                color = TextSecondary
+                                color = onSurfaceVariant
                             )
                         }
                     } else {
@@ -654,7 +659,7 @@ fun MainContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(
-                                    Color(0xFF00BCD4).copy(alpha = 0.1f),
+                                    quizColor.copy(alpha = 0.1f),
                                     RoundedCornerShape(8.dp)
                                 )
                                 .padding(16.dp),
@@ -663,14 +668,14 @@ fun MainContent(
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
-                                tint = Color(0xFF00BCD4),
+                                tint = quizColor,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 "Nenhuma tentativa realizada ainda.\nInicie o quiz para ver suas estatísticas!",
                                 fontSize = 13.sp,
-                                color = TextSecondary,
+                                color = onSurfaceVariant,
                                 lineHeight = 18.sp
                             )
                         }
@@ -697,10 +702,7 @@ fun ModoEstudoCardMelhorado(
     isCreating: Boolean = false,
     contentType: String = ""
 ) {
-    val animatedProgress by animateFloatAsState(
-        targetValue = if (isCreating) 1f else 0f,
-        label = "progress"
-    )
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
         onClick = if (enabled) onClick else {{}},
@@ -715,9 +717,11 @@ fun ModoEstudoCardMelhorado(
             containerColor = if (enabled)
                 MaterialTheme.colorScheme.surface
             else
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
         ),
-        enabled = enabled
+        enabled = enabled,
+        // ✅ Borda adicionada
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier
@@ -753,7 +757,7 @@ fun ModoEstudoCardMelhorado(
                         color = if (enabled)
                             MaterialTheme.colorScheme.onSurface
                         else
-                            TextSecondary
+                            onSurfaceVariant
                     )
                 }
 
@@ -779,7 +783,7 @@ fun ModoEstudoCardMelhorado(
             Text(
                 text = description,
                 fontSize = 14.sp,
-                color = TextSecondary,
+                color = onSurfaceVariant,
                 lineHeight = 20.sp
             )
 
@@ -802,7 +806,7 @@ fun ModoEstudoCardMelhorado(
                         Text(
                             "Gerando $contentType...",
                             fontSize = 13.sp,
-                            color = TextSecondary
+                            color = onSurfaceVariant
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
@@ -884,7 +888,7 @@ fun StatItemCompact(
         Text(
             text = label,
             fontSize = 13.sp,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -901,6 +905,8 @@ fun ErrorContent(
     onRetry: () -> Unit,
     onBack: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -925,15 +931,15 @@ fun ErrorContent(
         Button(
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(
-                containerColor = YellowAccent,
-                contentColor = Color.Black
+                containerColor = primaryColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             )
         ) {
             Text("Tentar Novamente")
         }
         Spacer(Modifier.height(8.dp))
         TextButton(onClick = onBack) {
-            Text("Voltar", color = TextSecondary)
+            Text("Voltar", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -942,6 +948,8 @@ fun ErrorContent(
 fun DeckNotFoundContent(
     onBack: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -952,7 +960,7 @@ fun DeckNotFoundContent(
         Icon(
             Icons.Default.SearchOff,
             contentDescription = null,
-            tint = TextSecondary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(64.dp)
         )
         Spacer(Modifier.height(16.dp))
@@ -965,15 +973,15 @@ fun DeckNotFoundContent(
         Spacer(Modifier.height(8.dp))
         Text(
             "Este deck pode ter sido excluído",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp
         )
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = onBack,
             colors = ButtonDefaults.buttonColors(
-                containerColor = YellowAccent,
-                contentColor = Color.Black
+                containerColor = primaryColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             )
         ) {
             Text("Voltar à Biblioteca")

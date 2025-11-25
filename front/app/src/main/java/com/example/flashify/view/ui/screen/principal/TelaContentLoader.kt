@@ -2,7 +2,9 @@ package com.example.flashify.view.ui.screen.principal
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,13 +16,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,11 +29,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.BIBLIOTECA_SCREEN_ROUTE
 import com.example.flashify.model.util.MAIN_SCREEN_ROUTE
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.DocumentProcessingState
 import kotlinx.coroutines.delay
@@ -72,6 +72,11 @@ fun TelaContentLoader(
     generatesQuizzes: Boolean,
     viewModel: DeckViewModel = hiltViewModel()
 ) {
+    // --- LÓGICA DO TEMA ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+
     val processingState by viewModel.documentProcessingState.collectAsStateWithLifecycle()
 
     LaunchedEffect(documentId) {
@@ -94,7 +99,8 @@ fun TelaContentLoader(
         }
     }
 
-    GradientBackgroundScreen {
+    // ✅ Passando isDarkTheme para o gradiente
+    GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Scaffold(
             containerColor = Color.Transparent
         ) { innerPadding ->
@@ -222,6 +228,9 @@ fun HeaderSection(
     isCompleted: Boolean,
     progress: Float
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth()
@@ -245,8 +254,8 @@ fun HeaderSection(
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            YellowAccent.copy(alpha = 0.2f),
-                            YellowAccent.copy(alpha = 0.1f)
+                            primaryColor.copy(alpha = 0.2f),
+                            primaryColor.copy(alpha = 0.1f)
                         )
                     )
                 ),
@@ -255,7 +264,7 @@ fun HeaderSection(
             Icon(
                 imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Psychology,
                 contentDescription = null,
-                tint = if (isCompleted) Color.Green else YellowAccent,
+                tint = if (isCompleted) Color.Green else primaryColor,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -280,7 +289,7 @@ fun HeaderSection(
             else
                 getSubtitle(generatesFlashcards, generatesQuizzes),
             fontSize = 13.sp,
-            color = TextSecondary,
+            color = secondaryColor,
             textAlign = TextAlign.Center,
             lineHeight = 18.sp,
             modifier = Modifier.padding(horizontal = 16.dp)
@@ -292,13 +301,15 @@ fun HeaderSection(
             text = "${(progress * 100).toInt()}%",
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
-            color = YellowAccent
+            color = primaryColor
         )
     }
 }
 
 @Composable
 fun ProgressBar(progress: Float, isCompleted: Boolean) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
@@ -323,7 +334,7 @@ fun ProgressBar(progress: Float, isCompleted: Boolean) {
                             colors = if (isCompleted) {
                                 listOf(Color.Green, Color.Green.copy(alpha = 0.7f))
                             } else {
-                                listOf(YellowAccent, YellowAccent.copy(alpha = 0.7f))
+                                listOf(primaryColor, primaryColor.copy(alpha = 0.7f))
                             }
                         )
                     )
@@ -339,15 +350,18 @@ fun ProcessingStepItem(
     animationDelay: Int
 ) {
     var visible by remember { mutableStateOf(false) }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     LaunchedEffect(Unit) {
         delay(animationDelay.toLong())
         visible = true
     }
 
+    // Cores adaptadas ao tema
     val backgroundColor = when (status) {
         StepStatus.ACTIVE -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-        StepStatus.COMPLETED -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        StepStatus.COMPLETED -> MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
         else -> Color.Transparent
     }
 
@@ -366,7 +380,11 @@ fun ProcessingStepItem(
             shape = RoundedCornerShape(12.dp),
             elevation = CardDefaults.cardElevation(
                 defaultElevation = if (status == StepStatus.ACTIVE) 1.dp else 0.dp
-            )
+            ),
+            // ✅ Borda adicionada para modo claro
+            border = if (status == StepStatus.ACTIVE || status == StepStatus.COMPLETED)
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            else null
         ) {
             Row(
                 modifier = Modifier
@@ -383,9 +401,9 @@ fun ProcessingStepItem(
                         fontSize = 13.sp,
                         fontWeight = if (status == StepStatus.ACTIVE) FontWeight.SemiBold else FontWeight.Normal,
                         color = when (status) {
-                            StepStatus.PENDING -> TextSecondary
-                            StepStatus.ACTIVE -> MaterialTheme.colorScheme.onBackground
-                            StepStatus.COMPLETED -> TextSecondary
+                            StepStatus.PENDING -> secondaryColor.copy(alpha = 0.7f)
+                            StepStatus.ACTIVE -> MaterialTheme.colorScheme.onSurface
+                            StepStatus.COMPLETED -> secondaryColor
                         },
                         lineHeight = 18.sp
                     )
@@ -395,7 +413,7 @@ fun ProcessingStepItem(
                         Text(
                             text = "Em andamento...",
                             fontSize = 11.sp,
-                            color = YellowAccent.copy(alpha = 0.8f)
+                            color = primaryColor
                         )
                     }
                 }
@@ -420,7 +438,7 @@ fun StatusIndicator(status: StepStatus) {
         StepStatus.ACTIVE -> {
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
-                color = YellowAccent,
+                color = MaterialTheme.colorScheme.primary,
                 strokeWidth = 2.dp
             )
         }
@@ -440,16 +458,18 @@ fun StepIcon(
     icon: ImageVector,
     status: StepStatus
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     val iconBackgroundColor = when (status) {
-        StepStatus.ACTIVE -> YellowAccent.copy(alpha = 0.15f)
+        StepStatus.ACTIVE -> primaryColor.copy(alpha = 0.15f)
         StepStatus.COMPLETED -> Color.Green.copy(alpha = 0.15f)
         StepStatus.PENDING -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     }
 
     val iconTint = when (status) {
-        StepStatus.ACTIVE -> YellowAccent
+        StepStatus.ACTIVE -> primaryColor
         StepStatus.COMPLETED -> Color.Green
-        StepStatus.PENDING -> TextSecondary
+        StepStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     }
 
     Box(
@@ -483,10 +503,12 @@ fun CompletedMessage() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = Color.Green.copy(alpha = 0.12f)
+                containerColor = MaterialTheme.colorScheme.surface
             ),
             shape = RoundedCornerShape(14.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            // ✅ Borda adicionada
+            border = BorderStroke(1.dp, Color.Green.copy(alpha = 0.3f))
         ) {
             Row(
                 modifier = Modifier
@@ -499,7 +521,7 @@ fun CompletedMessage() {
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(Color.Green.copy(alpha = 0.2f)),
+                        .background(Color.Green.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -515,14 +537,14 @@ fun CompletedMessage() {
                         text = "Processamento concluído!",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 18.sp
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = "Redirecionando para a biblioteca...",
                         fontSize = 12.sp,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 16.sp
                     )
                 }
@@ -540,10 +562,12 @@ fun ErrorMessage(message: String) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = Color.Red.copy(alpha = 0.12f)
+                containerColor = MaterialTheme.colorScheme.surface
             ),
             shape = RoundedCornerShape(14.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            // ✅ Borda adicionada
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
         ) {
             Row(
                 modifier = Modifier
@@ -556,13 +580,13 @@ fun ErrorMessage(message: String) {
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(Color.Red.copy(alpha = 0.2f)),
+                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Error,
                         contentDescription = null,
-                        tint = Color.Red,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -572,14 +596,14 @@ fun ErrorMessage(message: String) {
                         text = "Erro no processamento",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 18.sp
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = message,
                         fontSize = 12.sp,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 16.sp
                     )
                 }
@@ -590,6 +614,9 @@ fun ErrorMessage(message: String) {
 
 @Composable
 fun ProcessingMessage() {
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     val infiniteTransition = rememberInfiniteTransition(label = "fade")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.6f,
@@ -609,14 +636,14 @@ fun ProcessingMessage() {
         Icon(
             imageVector = Icons.Default.Info,
             contentDescription = null,
-            tint = YellowAccent.copy(alpha = alpha),
+            tint = primaryColor.copy(alpha = alpha),
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = "Essa ação pode demorar alguns minutos.\nPor favor, não feche esta página.",
             fontSize = 12.sp,
-            color = TextSecondary.copy(alpha = alpha),
+            color = secondaryColor.copy(alpha = alpha),
             textAlign = TextAlign.Center,
             lineHeight = 17.sp
         )

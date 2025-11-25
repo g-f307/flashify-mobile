@@ -1,6 +1,9 @@
 package com.example.flashify.view.ui.screen.principal
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -32,8 +35,6 @@ import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.*
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
-import com.example.flashify.view.ui.theme.TextSecondary
-import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.*
 import kotlinx.coroutines.launch
 
@@ -43,6 +44,12 @@ fun TelaPrincipal(
     deckViewModel: DeckViewModel = hiltViewModel(),
     homeViewModel: HomeViewModel = hiltViewModel()
 ) {
+    // --- LÓGICA DO TEMA MOVIDA PARA O TOPO ---
+    val context = LocalContext.current
+    val themeManager = remember { ThemeManager(context) }
+    // Ouve o estado do tema da app (não do sistema)
+    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsState()
     val generationLimitState by deckViewModel.generationLimitState.collectAsStateWithLifecycle()
@@ -56,12 +63,8 @@ fun TelaPrincipal(
                 deckViewModel.checkGenerationLimit()
             }
         }
-
         lifecycleOwner.lifecycle.addObserver(observer)
-
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(Unit) {
@@ -80,12 +83,7 @@ fun TelaPrincipal(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            // ✅ CORREÇÃO APLICADA:
-            // Envolvemos a barra numa Column com navigationBarsPadding().
-            // Isso empurra a barra para cima, exatamente acima dos botões do sistema.
-            Column(
-                modifier = Modifier.navigationBarsPadding()
-            ) {
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
                     navItems = navItems,
                     selectedItem = selectedItem,
@@ -93,25 +91,18 @@ fun TelaPrincipal(
                         selectedItem = clickedIndex
                         when (navItems[clickedIndex].label) {
                             "Início" -> { /* Já está aqui */ }
-                            "Criar" -> navController.navigate(CREATE_FLASHCARD_ROUTE) {
-                                popUpTo(MAIN_SCREEN_ROUTE)
-                            }
-                            "Biblioteca" -> navController.navigate(BIBLIOTECA_SCREEN_ROUTE) {
-                                popUpTo(MAIN_SCREEN_ROUTE)
-                            }
-                            "Progresso" -> navController.navigate(PROGRESSO_SCREEN_ROUTE) {
-                                popUpTo(MAIN_SCREEN_ROUTE)
-                            }
-                            "Config" -> navController.navigate(CONFIGURATION_SCREEN_ROUTE) {
-                                popUpTo(MAIN_SCREEN_ROUTE)
-                            }
+                            "Criar" -> navController.navigate(CREATE_FLASHCARD_ROUTE) { popUpTo(MAIN_SCREEN_ROUTE) }
+                            "Biblioteca" -> navController.navigate(BIBLIOTECA_SCREEN_ROUTE) { popUpTo(MAIN_SCREEN_ROUTE) }
+                            "Progresso" -> navController.navigate(PROGRESSO_SCREEN_ROUTE) { popUpTo(MAIN_SCREEN_ROUTE) }
+                            "Config" -> navController.navigate(CONFIGURATION_SCREEN_ROUTE) { popUpTo(MAIN_SCREEN_ROUTE) }
                         }
                     }
                 )
             }
         }
     ) { innerPadding ->
-        GradientBackgroundScreen {
+        // AGORA PASSAMOS O isDarkTheme CORRETO
+        GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -121,9 +112,12 @@ fun TelaPrincipal(
             ) {
                 Spacer(Modifier.height(16.dp))
 
+                // Passamos o ThemeManager e o estado para evitar recriar
                 CabecalhoUsuario(
                     homeViewModel = homeViewModel,
-                    generationLimitState = generationLimitState
+                    generationLimitState = generationLimitState,
+                    themeManager = themeManager,
+                    isDarkTheme = isDarkTheme
                 )
 
                 Spacer(Modifier.height(24.dp))
@@ -153,22 +147,22 @@ fun TelaPrincipal(
     }
 }
 
-// ... (O restante do código CabecalhoUsuario, SecaoStreak, etc. permanece idêntico) ...
 @Composable
 fun CabecalhoUsuario(
     homeViewModel: HomeViewModel,
     settingsViewModel: SettingsViewModel = hiltViewModel(),
-    generationLimitState: GenerationLimitState
+    generationLimitState: GenerationLimitState,
+    themeManager: ThemeManager, // Recebido por parâmetro
+    isDarkTheme: Boolean       // Recebido por parâmetro
 ) {
-    val context = LocalContext.current
-    val themeManager = remember { ThemeManager(context) }
-    val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = true)
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val iconColor = MaterialTheme.colorScheme.onBackground
+
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -182,7 +176,7 @@ fun CabecalhoUsuario(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(YellowAccent.copy(alpha = 0.3f)),
+                        .background(primaryColor.copy(alpha = 0.3f)),
                     contentAlignment = Alignment.Center
                 ) {
                     val initial = when (val state = userState) {
@@ -192,7 +186,7 @@ fun CabecalhoUsuario(
                     Text(
                         text = initial ?: "U",
                         fontWeight = FontWeight.Bold,
-                        color = YellowAccent,
+                        color = primaryColor,
                         fontSize = 18.sp
                     )
                 }
@@ -201,7 +195,7 @@ fun CabecalhoUsuario(
                     Text(
                         "Olá,",
                         fontSize = 14.sp,
-                        color = TextSecondary
+                        color = onSurfaceVariantColor
                     )
                     val username = when (val state = userState) {
                         is UserState.Loading -> "Carregando..."
@@ -230,7 +224,7 @@ fun CabecalhoUsuario(
                 Icon(
                     imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
                     contentDescription = "Mudar Tema",
-                    tint = MaterialTheme.colorScheme.onBackground
+                    tint = iconColor
                 )
             }
         }
@@ -238,6 +232,7 @@ fun CabecalhoUsuario(
         if (generationLimitState is GenerationLimitState.Success) {
             val info = (generationLimitState as GenerationLimitState.Success).info
             val isLimitReached = info.used >= info.limit
+            val errorColor = MaterialTheme.colorScheme.error
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -245,35 +240,43 @@ fun CabecalhoUsuario(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
+                    .border(
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                        RoundedCornerShape(12.dp)
+                    )
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Bolt,
                     contentDescription = null,
-                    tint = if (isLimitReached) Color(0xFFF44336) else YellowAccent,
+                    tint = if (isLimitReached) errorColor else primaryColor,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Gerações disponíveis: ",
                     fontSize = 12.sp,
-                    color = TextSecondary,
+                    color = onSurfaceVariantColor,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = "${info.remaining}",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isLimitReached) Color(0xFFF44336) else MaterialTheme.colorScheme.onSurface
+                    color = if (isLimitReached) errorColor else MaterialTheme.colorScheme.onSurface
                 )
             }
         }
     }
 }
 
+// ... As restantes funções (SecaoStreak, CartaoSessaoEstudo, etc.) mantêm-se iguais à versão anterior ...
+// Se precisares, posso reenviar o ficheiro completo com essas funções, mas só a parte de cima mudou.
 @Composable
 fun SecaoStreak(state: HomeUiState) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -291,7 +294,7 @@ fun SecaoStreak(state: HomeUiState) {
                     Icon(
                         imageVector = Icons.Default.LocalFireDepartment,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(Modifier.width(4.dp))
@@ -299,7 +302,7 @@ fun SecaoStreak(state: HomeUiState) {
                         "${state.streakCount} dias",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = YellowAccent
+                        color = primaryColor
                     )
                 }
             }
@@ -308,7 +311,8 @@ fun SecaoStreak(state: HomeUiState) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
         ) {
             Box(
                 modifier = Modifier
@@ -319,7 +323,7 @@ fun SecaoStreak(state: HomeUiState) {
                 if (state.isLoadingStreak) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = YellowAccent
+                        color = primaryColor
                     )
                 } else if (state.errorMessage != null) {
                     Column(
@@ -335,7 +339,7 @@ fun SecaoStreak(state: HomeUiState) {
                         Spacer(Modifier.height(4.dp))
                         Text(
                             state.errorMessage ?: "Erro desconhecido",
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
                     }
@@ -356,10 +360,14 @@ fun SecaoStreak(state: HomeUiState) {
 
 @Composable
 fun DiaStreakItem(day: StreakDay) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val errorColor = MaterialTheme.colorScheme.error
+
     val (icon, color) = when (day.status) {
-        StreakStatus.STUDIED -> "★" to YellowAccent
-        StreakStatus.MISSED -> "✕" to Color.Red.copy(alpha = 0.7f)
-        StreakStatus.PENDING -> "○" to TextSecondary
+        StreakStatus.STUDIED -> "★" to primaryColor
+        StreakStatus.MISSED -> "✕" to errorColor.copy(alpha = 0.7f)
+        StreakStatus.PENDING -> "○" to secondaryTextColor
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -382,12 +390,15 @@ fun DiaStreakItem(day: StreakDay) {
 
 @Composable
 fun CartaoSessaoEstudo(modifier: Modifier = Modifier, navController: NavController) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .height(200.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
@@ -403,7 +414,7 @@ fun CartaoSessaoEstudo(modifier: Modifier = Modifier, navController: NavControll
                     Icon(
                         imageVector = Icons.Default.Timer,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(24.dp)
                     )
                     Text(
@@ -417,19 +428,19 @@ fun CartaoSessaoEstudo(modifier: Modifier = Modifier, navController: NavControll
                 Text(
                     "Estude com foco e concentração",
                     fontSize = 13.sp,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 18.sp
                 )
             }
             Button(
                 onClick = { navController.navigate(BIBLIOTECA_SCREEN_ROUTE) },
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = YellowAccent),
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     "Iniciar",
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(vertical = 4.dp)
@@ -441,12 +452,15 @@ fun CartaoSessaoEstudo(modifier: Modifier = Modifier, navController: NavControll
 
 @Composable
 fun CartaoProgresso(modifier: Modifier = Modifier, state: HomeUiState) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .height(200.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
@@ -470,7 +484,7 @@ fun CartaoProgresso(modifier: Modifier = Modifier, state: HomeUiState) {
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = YellowAccent
+                        color = primaryColor
                     )
                 }
             } else {
@@ -481,9 +495,9 @@ fun CartaoProgresso(modifier: Modifier = Modifier, state: HomeUiState) {
                     CircularProgressIndicator(
                         progress = state.studyTimerProgress,
                         modifier = Modifier.size(90.dp),
-                        color = YellowAccent,
+                        color = primaryColor,
                         strokeWidth = 8.dp,
-                        trackColor = MaterialTheme.colorScheme.background
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -495,7 +509,7 @@ fun CartaoProgresso(modifier: Modifier = Modifier, state: HomeUiState) {
                         Text(
                             "${state.cardsStudiedWeek} cards",
                             fontSize = 12.sp,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -536,13 +550,19 @@ fun SecaoContinuarEstudando(state: DeckListState, navController: NavController) 
 
 @Composable
 fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val isDarkTheme = isSystemInDarkTheme()
+
+    val quizColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
+
     Card(
         onClick = onClick,
         modifier = Modifier
             .width(280.dp)
             .height(140.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
@@ -562,7 +582,7 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                     Icon(
                         Icons.Default.MenuBook,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -586,7 +606,7 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .background(
-                            color = YellowAccent.copy(alpha = 0.2f),
+                            color = primaryColor.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -594,7 +614,7 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                     Icon(
                         Icons.Default.Style,
                         contentDescription = null,
-                        tint = YellowAccent,
+                        tint = primaryColor,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
@@ -602,7 +622,7 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                         "${deck.totalFlashcards}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = YellowAccent
+                        color = primaryColor
                     )
                 }
 
@@ -611,7 +631,7 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                color = Color(0xFF00BCD4).copy(alpha = 0.2f),
+                                color = quizColor.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -619,7 +639,7 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                         Icon(
                             Icons.Default.Quiz,
                             contentDescription = null,
-                            tint = Color(0xFF00BCD4),
+                            tint = quizColor,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
@@ -627,7 +647,7 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
                             "Quiz",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF00BCD4)
+                            color = quizColor
                         )
                     }
                 }
@@ -638,12 +658,12 @@ fun CartaoDeckRecente(deck: DeckResponse, onClick: () -> Unit) {
             Button(
                 onClick = onClick,
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = YellowAccent),
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     "Estudar",
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
