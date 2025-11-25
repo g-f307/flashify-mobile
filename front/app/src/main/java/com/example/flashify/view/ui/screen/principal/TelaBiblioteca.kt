@@ -41,8 +41,8 @@ import com.example.flashify.viewmodel.*
 @Composable
 fun TelaPrincipalBiblioteca(
     navController: NavController,
-    deckViewModel: DeckViewModel = hiltViewModel(), // ✅ ATUALIZADO
-    folderViewModel: FolderViewModel = hiltViewModel() // ✅ ATUALIZADO
+    deckViewModel: DeckViewModel = hiltViewModel(),
+    folderViewModel: FolderViewModel = hiltViewModel()
 ) {
     val deckActionState by deckViewModel.deckActionState.collectAsStateWithLifecycle()
     val libraryState by folderViewModel.libraryState.collectAsStateWithLifecycle()
@@ -193,13 +193,9 @@ fun TelaPrincipalBiblioteca(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            BottomAppBar(
-                containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) {
+            // ✅ CORREÇÃO APLICADA: Column com navigationBarsPadding
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
-                    modifier = Modifier.clip(RoundedCornerShape(50)),
                     navItems = navItems,
                     selectedItem = selectedItem,
                     onItemSelected = { clickedIndex ->
@@ -523,7 +519,6 @@ fun FolderItemWithMenu(
                 }
             }
 
-            // ✅ MENU DE OPÇÕES
             Box {
                 IconButton(
                     onClick = { showMenu = true },
@@ -593,7 +588,6 @@ fun FolderItemWithMenu(
     }
 }
 
-// ✅ NOVO DIÁLOGO: Renomear Pasta
 @Composable
 fun EditFolderDialog(
     currentName: String,
@@ -676,7 +670,6 @@ fun EditFolderDialog(
     )
 }
 
-// ✅ NOVO DIÁLOGO: Excluir Pasta
 @Composable
 fun DeleteFolderDialog(
     folderName: String,
@@ -812,7 +805,6 @@ fun DeleteFolderDialog(
     )
 }
 
-// ✅ ATUALIZADO: MoveToPastaDialog com currentFolderId
 @Composable
 fun MoveToPastaDialog(
     folders: List<FolderWithDocumentsResponse>,
@@ -840,7 +832,6 @@ fun MoveToPastaDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Opção para raiz (sem pasta) - só aparece se não estiver na raiz
                 if (currentFolderId != null) {
                     Surface(
                         modifier = Modifier
@@ -891,7 +882,6 @@ fun MoveToPastaDialog(
                     Spacer(Modifier.height(12.dp))
                 }
 
-                // Lista de pastas (excluindo a pasta atual)
                 folders.filter { it.id != currentFolderId }.forEach { folder ->
                     Spacer(Modifier.height(8.dp))
                     Surface(
@@ -975,7 +965,6 @@ fun MoveToPastaDialog(
     )
 }
 
-// Componentes que já existiam no seu código (mantidos iguais)
 @Composable
 fun ActionButtons(
     onCreateFolderClick: () -> Unit,

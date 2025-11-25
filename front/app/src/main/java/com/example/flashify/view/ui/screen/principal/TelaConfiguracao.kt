@@ -35,7 +35,7 @@ import com.example.flashify.viewmodel.UserState
 @Composable
 fun TelaPrincipalConfiguracao(
     navController: NavController,
-    settingsViewModel: SettingsViewModel = hiltViewModel() // ✅ ATUALIZADO
+    settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
     var notificationsEnabled by remember { mutableStateOf(true) }
     var darkModeEnabled by remember { mutableStateOf(true) }
@@ -57,13 +57,9 @@ fun TelaPrincipalConfiguracao(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            BottomAppBar(
-                containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) {
+            // ✅ CORREÇÃO APLICADA: Column com navigationBarsPadding
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
-                    modifier = Modifier.clip(RoundedCornerShape(50)),
                     navItems = navItems,
                     selectedItem = selectedItem,
                     onItemSelected = { clickedIndex ->

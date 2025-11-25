@@ -80,13 +80,13 @@ fun TelaPrincipal(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            BottomAppBar(
-                containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            // ✅ CORREÇÃO APLICADA:
+            // Envolvemos a barra numa Column com navigationBarsPadding().
+            // Isso empurra a barra para cima, exatamente acima dos botões do sistema.
+            Column(
+                modifier = Modifier.navigationBarsPadding()
             ) {
                 NavegacaoBotaoAbaixo(
-                    modifier = Modifier.clip(RoundedCornerShape(50)),
                     navItems = navItems,
                     selectedItem = selectedItem,
                     onItemSelected = { clickedIndex ->
@@ -153,6 +153,7 @@ fun TelaPrincipal(
     }
 }
 
+// ... (O restante do código CabecalhoUsuario, SecaoStreak, etc. permanece idêntico) ...
 @Composable
 fun CabecalhoUsuario(
     homeViewModel: HomeViewModel,
@@ -165,17 +166,14 @@ fun CabecalhoUsuario(
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
-    // Transformamos o Row principal numa Column para acomodar o status em baixo
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
-        // --- LINHA SUPERIOR: Avatar, Nome, Tema ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Avatar e Nome
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
@@ -222,7 +220,6 @@ fun CabecalhoUsuario(
                 }
             }
 
-            // Botão de Tema (Lado direito fixo)
             IconButton(
                 onClick = {
                     scope.launch {
@@ -244,12 +241,11 @@ fun CabecalhoUsuario(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Status Chip customizado
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)) // Fundo subtil
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Icon(

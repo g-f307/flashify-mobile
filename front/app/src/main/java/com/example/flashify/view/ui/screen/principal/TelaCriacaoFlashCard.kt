@@ -44,7 +44,7 @@ import kotlin.math.roundToInt
 @Composable
 fun TelaCriacaoFlashCard(
     navController: NavController,
-    viewModel: DeckViewModel = hiltViewModel(), // ✅ Hilt ViewModel
+    viewModel: DeckViewModel = hiltViewModel(),
     folderId: Int? = null
 ) {
     var currentStep by remember { mutableStateOf(1) }
@@ -115,13 +115,9 @@ fun TelaCriacaoFlashCard(
             )
             val selectedItemIndex = 2
 
-            BottomAppBar(
-                containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) {
+            // ✅ CORREÇÃO APLICADA: Column com navigationBarsPadding
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
-                    modifier = Modifier.clip(RoundedCornerShape(50)),
                     navItems = navItems,
                     selectedItem = selectedItemIndex,
                     onItemSelected = { clickedIndex ->
@@ -817,8 +813,8 @@ fun StepQuantity(
             Slider(
                 value = flashcardQuantity,
                 onValueChange = onQuantityChange,
-                valueRange = 5f..20f,  // ✅ ALTERADO DE 50f PARA 20f
-                steps = 14,             // ✅ ALTERADO DE 44 PARA 14 (5 a 20 = 15 valores, -1 = 14 steps)
+                valueRange = 5f..20f,
+                steps = 14,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = YellowAccent,
@@ -838,7 +834,7 @@ fun StepQuantity(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    "20 máximo",  // ✅ ALTERADO DE "50 máximo" PARA "20 máximo"
+                    "20 máximo",
                     color = TextSecondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
