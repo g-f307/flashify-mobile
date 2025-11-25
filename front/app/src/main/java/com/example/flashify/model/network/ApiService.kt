@@ -20,7 +20,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 import java.util.concurrent.TimeUnit
 
-private const val BASE_URL = "http://10.42.0.1:9000/"
+private const val BASE_URL = "http://192.168.1.28:9000/"
 
 private val okHttpClient = OkHttpClient.Builder()
     .connectTimeout(120, TimeUnit.SECONDS) // 2 minutos para conectar

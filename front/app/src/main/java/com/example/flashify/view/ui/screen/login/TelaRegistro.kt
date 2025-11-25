@@ -1,28 +1,29 @@
 package com.example.flashify.view.ui.screen.login
 
 import android.widget.Toast
-import androidx.compose.foundation.Image
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -30,13 +31,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.R
 import com.example.flashify.model.util.LOGIN_SCREEN_ROUTE
+import com.example.flashify.view.ui.theme.CyanFlashify
+import com.example.flashify.view.ui.theme.DarkText
+import com.example.flashify.view.ui.theme.LightTextSecondary
+import com.example.flashify.view.ui.theme.YellowFlashify
 import com.example.flashify.viewmodel.RegisterUIState
 import com.example.flashify.viewmodel.RegisterViewModel
+import com.example.flashify.viewmodel.SocialLoginViewModel
+import com.example.flashify.viewmodel.SocialLoginUIState
 
 @Composable
 fun TelaRegistro(
     navController: NavController,
-    viewModel: RegisterViewModel = hiltViewModel() // ✅ ATUALIZADO
+    viewModel: RegisterViewModel = hiltViewModel()
 ) {
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -45,444 +52,340 @@ fun TelaRegistro(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
-    var usernameError by remember { mutableStateOf<String?>(null) }
-    var emailError by remember { mutableStateOf<String?>(null) }
-    var passwordError by remember { mutableStateOf<String?>(null) }
-    var confirmPasswordError by remember { mutableStateOf<String?>(null) }
-
     val uiState by viewModel.registerState.collectAsStateWithLifecycle()
+    val socialLoginViewModel: SocialLoginViewModel = hiltViewModel()
+    val socialLoginState by socialLoginViewModel.socialLoginState.collectAsStateWithLifecycle()
+
     val context = LocalContext.current
-
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val screenHeight = configuration.screenHeightDp.dp
-    val screenWidth = configuration.screenWidthDp.dp
 
-    val isSmallScreen = screenHeight < 650.dp
-    val isVerySmallScreen = screenHeight < 550.dp
-    val isLargeScreen = screenWidth > 600.dp
+    // Estado de expansão
+    var isExpanded by remember { mutableStateOf(false) }
 
-    val horizontalPadding = when {
-        isLargeScreen -> (screenWidth * 0.25f).coerceAtMost(200.dp)
-        else -> 32.dp
-    }
+    // Variável para acumular o arrasto e evitar disparos acidentais
+    var dragOffset by remember { mutableFloatStateOf(0f) }
 
-    val logoSize = when {
-        isVerySmallScreen -> 35.dp
-        isSmallScreen -> 40.dp
-        else -> 50.dp
-    }
+    // Define a sensibilidade do arrasto (ex: 50dp)
+    val dragThreshold = with(density) { 50.dp.toPx() }
 
-    val titleSize = when {
-        isVerySmallScreen -> 22.sp
-        isSmallScreen -> 24.sp
-        else -> 28.sp
-    }
+    val scrollState = rememberScrollState()
 
-    val subtitleSize = when {
-        isVerySmallScreen -> 13.sp
-        isSmallScreen -> 14.sp
-        else -> 16.sp
-    }
+    // Animação da posição do cartão branco
+    val topPadding by animateDpAsState(
+        targetValue = if (isExpanded) screenHeight * 0.15f else screenHeight * 0.40f,
+        animationSpec = tween(durationMillis = 500),
+        label = "TopPaddingAnimation"
+    )
 
-    val verticalSpacing = when {
-        isVerySmallScreen -> 8.dp
-        isSmallScreen -> 10.dp
-        else -> 16.dp
-    }
-
-    val sectionSpacing = when {
-        isVerySmallScreen -> 12.dp
-        isSmallScreen -> 16.dp
-        else -> 24.dp
-    }
-
-    val buttonHeight = when {
-        isVerySmallScreen -> 44.dp
-        isSmallScreen -> 46.dp
-        else -> 50.dp
-    }
-
-    val fieldFontSize = when {
-        isVerySmallScreen -> 12.sp
-        isSmallScreen -> 13.sp
-        else -> 14.sp
-    }
-
-    val supportTextSize = when {
-        isVerySmallScreen -> 9.sp
-        isSmallScreen -> 10.sp
-        else -> 12.sp
-    }
-
-    fun isValidEmail(email: String): Boolean {
-        return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
-    }
-
-    fun validatePasswordStrength(password: String): String? {
-        return when {
-            password.length < 8 -> "Mínimo 8 caracteres"
-            !password.any { it.isDigit() } -> "Adicione um número"
-            !password.any { it.isUpperCase() } -> "Adicione maiúscula"
-            !password.any { it.isLowerCase() } -> "Adicione minúscula"
-            else -> null
-        }
-    }
-
-    fun validateFields(): Boolean {
-        var isValid = true
-
-        when {
-            username.isBlank() -> {
-                usernameError = "Campo obrigatório"
-                isValid = false
+    // NestedScrollConnection para capturar o drag
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0 && !isExpanded) {
+                    dragOffset += available.y
+                    if (dragOffset < -dragThreshold) {
+                        isExpanded = true
+                        dragOffset = 0f
+                    }
+                    return available
+                }
+                return Offset.Zero
             }
-            username.length < 3 -> {
-                usernameError = "Mínimo 3 caracteres"
-                isValid = false
-            }
-            username.length > 20 -> {
-                usernameError = "Máximo 20 caracteres"
-                isValid = false
-            }
-            !username.matches(Regex("^[a-zA-Z0-9_]+$")) -> {
-                usernameError = "Apenas letras, números e _"
-                isValid = false
-            }
-            else -> usernameError = null
-        }
 
-        when {
-            email.isBlank() -> {
-                emailError = "Campo obrigatório"
-                isValid = false
-            }
-            !isValidEmail(email) -> {
-                emailError = "Email inválido"
-                isValid = false
-            }
-            else -> emailError = null
-        }
-
-        when {
-            password.isBlank() -> {
-                passwordError = "Campo obrigatório"
-                isValid = false
-            }
-            else -> {
-                passwordError = validatePasswordStrength(password)
-                if (passwordError != null) isValid = false
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (available.y > 0 && isExpanded) {
+                    dragOffset += available.y
+                    if (dragOffset > dragThreshold) {
+                        isExpanded = false
+                        dragOffset = 0f
+                    }
+                    return available
+                }
+                return Offset.Zero
             }
         }
+    }
 
-        when {
-            confirmPassword.isBlank() -> {
-                confirmPasswordError = "Campo obrigatório"
-                isValid = false
-            }
-            confirmPassword != password -> {
-                confirmPasswordError = "Senhas não coincidem"
-                isValid = false
-            }
-            else -> confirmPasswordError = null
-        }
-
-        return isValid
+    // Reseta o offset se o estado mudar
+    LaunchedEffect(isExpanded) {
+        dragOffset = 0f
     }
 
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is RegisterUIState.Success -> {
-                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Cadastro realizado!", Toast.LENGTH_LONG).show()
+                viewModel.resetState()
                 navController.navigate(LOGIN_SCREEN_ROUTE) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 }
             }
             is RegisterUIState.Error -> {
-                when {
-                    state.message.contains("username", ignoreCase = true) &&
-                            state.message.contains("exists", ignoreCase = true) -> {
-                        usernameError = "Usuário já existe"
-                        Toast.makeText(
-                            context,
-                            "Nome de usuário já cadastrado. Escolha outro.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    state.message.contains("email", ignoreCase = true) &&
-                            state.message.contains("exists", ignoreCase = true) -> {
-                        emailError = "Email já cadastrado"
-                        Toast.makeText(
-                            context,
-                            "Email já cadastrado. Faça login ou use outro email.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    state.message.contains("password", ignoreCase = true) -> {
-                        passwordError = "Senha insegura"
-                        Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
-                    }
-
-                    state.message.contains("network") ||
-                            state.message.contains("timeout") -> {
-                        Toast.makeText(
-                            context,
-                            "Erro de conexão. Verifique sua internet.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    state.message.contains("500") -> {
-                        Toast.makeText(
-                            context,
-                            "Erro no servidor. Tente novamente mais tarde.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-
-                    else -> {
-                        Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
-                    }
-                }
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                viewModel.resetState()
             }
             else -> {}
         }
     }
 
-    Scaffold { innerPadding ->
+    LaunchedEffect(socialLoginState) {
+        when (val state = socialLoginState) {
+            is SocialLoginUIState.Success -> {
+                Toast.makeText(context, "Cadastro com Google bem-sucedido!", Toast.LENGTH_SHORT).show()
+                socialLoginViewModel.resetState()
+                navController.navigate(com.example.flashify.model.util.MAIN_SCREEN_ROUTE) {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+            is SocialLoginUIState.Error -> {
+                Toast.makeText(context, "Erro no cadastro com Google", Toast.LENGTH_LONG).show()
+                socialLoginViewModel.resetState()
+            }
+            else -> {}
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CyanFlashify)
+            .imePadding() // AJUSTA QUANDO O TECLADO APARECE
+    ) {
+        // Header fixo
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(topPadding)
+        ) {
+            AuthHeaderSection(
+                title = "Crie sua conta",
+                subtitle = "no Flashify",
+                proportion = 1f
+            )
+        }
+
+        // Container do Formulário (Cartão Branco)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(top = topPadding)
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = horizontalPadding)
-                    .padding(vertical = if (isSmallScreen) 12.dp else 24.dp),
-                verticalArrangement = if (isSmallScreen)
-                    Arrangement.Top
-                else
-                    Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .nestedScroll(nestedScrollConnection),
+                shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                color = Color.White,
+                shadowElevation = 16.dp,
+                border = BorderStroke(3.dp, CyanFlashify)
             ) {
-                if (isSmallScreen) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                Image(
-                    painter = painterResource(id = R.drawable.flashify),
-                    contentDescription = "Logo Flashify",
-                    modifier = Modifier.size(logoSize)
-                )
-                Spacer(modifier = Modifier.height(sectionSpacing))
-
-                Text(
-                    text = "Crie a sua conta",
-                    fontSize = titleSize,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Comece a estudar de forma mais inteligente.",
-                    fontSize = subtitleSize,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(sectionSpacing))
-
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = {
-                        username = it
-                        if (usernameError != null) usernameError = null
-                    },
-                    label = { Text("Usuário", fontSize = fieldFontSize) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    isError = usernameError != null,
-                    supportingText = {
-                        Text(
-                            text = usernameError ?: "Letras, números e _",
-                            color = if (usernameError != null)
-                                MaterialTheme.colorScheme.error
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = supportTextSize
-                        )
-                    }
-                )
-                Spacer(modifier = Modifier.height(verticalSpacing))
-
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = {
-                        email = it
-                        if (emailError != null) emailError = null
-                    },
-                    label = { Text("E-mail", fontSize = fieldFontSize) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    isError = emailError != null,
-                    supportingText = if (emailError != null) {
-                        {
-                            Text(
-                                text = emailError!!,
-                                color = MaterialTheme.colorScheme.error,
-                                fontSize = supportTextSize
-                            )
-                        }
-                    } else null
-                )
-                Spacer(modifier = Modifier.height(verticalSpacing))
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        if (passwordError != null) passwordError = null
-                    },
-                    label = { Text("Senha", fontSize = fieldFontSize) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = if (passwordVisible)
-                        VisualTransformation.None
-                    else
-                        PasswordVisualTransformation(),
-                    shape = RoundedCornerShape(12.dp),
-                    isError = passwordError != null,
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible)
-                                    Icons.Default.Visibility
-                                else
-                                    Icons.Default.VisibilityOff,
-                                contentDescription = if (passwordVisible)
-                                    "Ocultar"
-                                else
-                                    "Mostrar",
-                                modifier = Modifier.size(if (isSmallScreen) 18.dp else 20.dp)
-                            )
-                        }
-                    },
-                    supportingText = {
-                        Text(
-                            text = passwordError ?: "8+ caracteres, 1 maiúscula, 1 número",
-                            color = if (passwordError != null)
-                                MaterialTheme.colorScheme.error
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = supportTextSize
-                        )
-                    }
-                )
-                Spacer(modifier = Modifier.height(verticalSpacing))
-
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = {
-                        confirmPassword = it
-                        if (confirmPasswordError != null) confirmPasswordError = null
-                    },
-                    label = { Text("Confirmar Senha", fontSize = fieldFontSize) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = if (confirmPasswordVisible)
-                        VisualTransformation.None
-                    else
-                        PasswordVisualTransformation(),
-                    shape = RoundedCornerShape(12.dp),
-                    isError = confirmPasswordError != null,
-                    trailingIcon = {
-                        IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                            Icon(
-                                imageVector = if (confirmPasswordVisible)
-                                    Icons.Default.Visibility
-                                else
-                                    Icons.Default.VisibilityOff,
-                                contentDescription = if (confirmPasswordVisible)
-                                    "Ocultar"
-                                else
-                                    "Mostrar",
-                                modifier = Modifier.size(if (isSmallScreen) 18.dp else 20.dp)
-                            )
-                        }
-                    },
-                    supportingText = if (confirmPasswordError != null) {
-                        {
-                            Text(
-                                text = confirmPasswordError!!,
-                                color = MaterialTheme.colorScheme.error,
-                                fontSize = supportTextSize
-                            )
-                        }
-                    } else null
-                )
-                Spacer(modifier = Modifier.height(sectionSpacing))
-
-                Button(
-                    onClick = {
-                        if (validateFields()) {
-                            viewModel.registerUser(username, email, password)
-                        }
-                    },
-                    enabled = uiState != RegisterUIState.Loading,
-                    modifier = Modifier.fillMaxWidth().height(buttonHeight),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 24.dp, vertical = 20.dp)
+                        .navigationBarsPadding(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (uiState == RegisterUIState.Loading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(if (isSmallScreen) 20.dp else 24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
+                    // Indicador visual de arrasto
+                    Box(
+                        modifier = Modifier
+                            .width(50.dp)
+                            .height(5.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(LightTextSecondary.copy(alpha = 0.4f))
+                            .clickable { isExpanded = !isExpanded }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Crie sua conta",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DarkText,
+                        modifier = Modifier
+                            .align(Alignment.Start)
+                            .padding(bottom = 4.dp)
+                    )
+
+                    // --- Campos Sempre Visíveis ---
+                    AuthTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = "Usuário",
+                        icon = Icons.Default.Person
+                    )
+
+                    AuthTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = "Email",
+                        icon = Icons.Default.Email
+                    )
+
+                    // --- Botão/Hint para expandir ---
+                    AnimatedVisibility(
+                        visible = !isExpanded,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp)
+                                .clickable { isExpanded = true },
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Expandir",
+                                tint = CyanFlashify,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Deslize para cima ou toque aqui",
+                                color = CyanFlashify,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // --- Campos Condicionais (Senha) ---
+                    AnimatedVisibility(
+                        visible = isExpanded,
+                        enter = fadeIn(tween(300)) + expandVertically(tween(300)),
+                        exit = fadeOut(tween(200)) + shrinkVertically(tween(200))
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            AuthTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = "Senha",
+                                icon = Icons.Default.Lock,
+                                isPassword = true,
+                                passwordVisible = passwordVisible,
+                                onPasswordVisibilityChange = { passwordVisible = !passwordVisible }
+                            )
+
+                            Text(
+                                text = "Mínimo 8 caracteres, 1 maiúscula, 1 número",
+                                fontSize = 10.sp,
+                                color = LightTextSecondary,
+                                modifier = Modifier
+                                    .align(Alignment.Start)
+                                    .padding(start = 4.dp)
+                                    .offset(y = (-6).dp)
+                            )
+
+                            AuthTextField(
+                                value = confirmPassword,
+                                onValueChange = { confirmPassword = it },
+                                label = "Confirmar Senha",
+                                icon = Icons.Default.Lock,
+                                isPassword = true,
+                                passwordVisible = confirmPasswordVisible,
+                                onPasswordVisibilityChange = {
+                                    confirmPasswordVisible = !confirmPasswordVisible
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Button(
+                                onClick = { viewModel.registerUser(username, email, password) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = YellowFlashify,
+                                    disabledContainerColor = YellowFlashify.copy(alpha = 0.6f)
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(8.dp),
+                                enabled = uiState !is RegisterUIState.Loading
+                            ) {
+                                if (uiState is RegisterUIState.Loading) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        "CRIAR CONTA",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                HorizontalDivider(
+                                    modifier = Modifier.weight(1f),
+                                    thickness = 1.dp,
+                                    color = LightTextSecondary.copy(alpha = 0.3f)
+                                )
+                                Text("ou", color = LightTextSecondary, fontSize = 11.sp)
+                                HorizontalDivider(
+                                    modifier = Modifier.weight(1f),
+                                    thickness = 1.dp,
+                                    color = LightTextSecondary.copy(alpha = 0.3f)
+                                )
+                            }
+
+                            SocialLoginButton(
+                                iconRes = R.drawable.ic_google_logo,
+                                onClick = { socialLoginViewModel.signInWithGoogle() },
+                                isLoading = socialLoginState is SocialLoginUIState.Loading
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Já tem uma conta? ", color = LightTextSecondary, fontSize = 13.sp)
                         Text(
-                            "Criar conta",
+                            "Faça login",
+                            color = CyanFlashify,
                             fontWeight = FontWeight.Bold,
-                            fontSize = if (isSmallScreen) 14.sp else 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            fontSize = 13.sp,
+                            modifier = Modifier.clickable {
+                                navController.navigate(LOGIN_SCREEN_ROUTE) {
+                                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                }
+                            }
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(sectionSpacing))
-
-                OrDivider(isSmallScreen = isSmallScreen)
-                Spacer(modifier = Modifier.height(sectionSpacing))
-
-                GoogleSignInButton(
-                    onClick = { /* TODO: Lógica de login com Google */ },
-                    isSmallScreen = isSmallScreen,
-                    buttonHeight = buttonHeight
-                )
-
-                Spacer(modifier = Modifier.height(sectionSpacing))
-
-                ClickableText(
-                    text = AnnotatedString("Já tem uma conta? Faça login"),
-                    onClick = {
-                        navController.navigate(LOGIN_SCREEN_ROUTE) {
-                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                        }
-                    },
-                    style = TextStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = if (isSmallScreen) 13.sp else 14.sp
-                    )
-                )
-
-                if (isSmallScreen) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
