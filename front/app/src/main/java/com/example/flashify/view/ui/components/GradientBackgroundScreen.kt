@@ -14,17 +14,15 @@ fun GradientBackgroundScreen(
     isDarkTheme: Boolean,
     content: @Composable () -> Unit
 ) {
-    // Gradiente EXTREMAMENTE suave (Quase imperceptível)
-    val gradientBrush = Brush.verticalGradient(
+    // Gradiente suave para tema claro (do amarelo pálido ao branco)
+    val lightGradientBrush = Brush.verticalGradient(
         colors = listOf(
-            // Topo: Um tom "creme" muito pálido (Light Yellow 50)
-            // Dá apenas um toque de calor ao topo da tela
-            Color(0xFFFFFDE7),
-
-            // Fundo: Branco puro
-            // O gradiente funde-se completamente com o branco antes de chegar ao meio
-            Color(0xFFFFFFFF)
-        )
+            Color(0xFFFFFDE7), // Light Yellow 50 - topo
+            Color(0xFFFFFEF5), // Transição suave
+            Color(0xFFFFFFFF)  // Branco puro - fundo
+        ),
+        startY = 0f,
+        endY = 1000f // Transição mais suave
     )
 
     Box(
@@ -32,8 +30,9 @@ fun GradientBackgroundScreen(
             .fillMaxSize()
             .then(
                 if (!isDarkTheme) {
-                    Modifier.background(gradientBrush)
+                    Modifier.background(lightGradientBrush)
                 } else {
+                    // Tema escuro usa cor sólida do MaterialTheme
                     Modifier.background(MaterialTheme.colorScheme.background)
                 }
             )

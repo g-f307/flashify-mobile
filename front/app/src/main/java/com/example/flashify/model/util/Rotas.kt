@@ -25,6 +25,7 @@ import com.example.flashify.view.ui.screen.landing.TelaLanding
 // Importando o TokenManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.view.ui.screen.login.TelaRegistro
+import com.example.flashify.view.ui.screen.suporte.TelaCentralAjuda
 
 // --- Definindo as "Rotas" (os nomes das nossas telas) ---
 const val LANDING_SCREEN_ROUTE = "landing_screen"
@@ -40,6 +41,7 @@ const val QUIZ_SCREEN_ROUTE = "quiz_screen_route"
 const val ESCOLHA_MODO_ESTUDO_ROUTE = "escolha_modo_estudo_route"
 const val DETALHE_PASTA_ROUTE = "detalhe_pasta_route"
 const val CONTENT_LOADER_ROUTE = "content_loader_route"
+const val CENTRAL_AJUDA_ROUTE = "central_ajuda"
 
 
 @Composable
@@ -143,6 +145,10 @@ fun AppNavigation() {
                 navController = navController,
                 folderId = if (folderId == -1) null else folderId
             )
+        }
+
+        composable(CENTRAL_AJUDA_ROUTE) {
+            TelaCentralAjuda(navController = navController)
         }
         
         composable(
