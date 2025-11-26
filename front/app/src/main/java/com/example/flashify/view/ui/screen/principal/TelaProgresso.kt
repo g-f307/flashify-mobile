@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -105,7 +106,6 @@ fun TelaProgresso(
             }
         }
     ) { innerPadding ->
-        // ✅ Passamos isDarkTheme para o gradiente
         GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
             Column(
                 modifier = Modifier
@@ -114,9 +114,9 @@ fun TelaProgresso(
                     .padding(horizontal = 24.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(24.dp))
 
-                // Header com ícone
+                // HEADER ORIGINAL (Ícone + Título)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -128,11 +128,12 @@ fun TelaProgresso(
                             .background(
                                 brush = Brush.verticalGradient(
                                     colors = listOf(
-                                        primaryColor.copy(alpha = 0.3f),
-                                        primaryColor.copy(alpha = 0.15f)
+                                        primaryColor.copy(alpha = 0.2f),
+                                        primaryColor.copy(alpha = 0.1f)
                                     )
                                 )
-                            ),
+                            )
+                            .border(1.5.dp, primaryColor.copy(alpha = 0.5f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -146,7 +147,7 @@ fun TelaProgresso(
                     Column {
                         Text(
                             "Seu Progresso",
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
@@ -162,7 +163,9 @@ fun TelaProgresso(
 
                 if (homeState.isLoadingProgress) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(color = primaryColor)
@@ -192,7 +195,7 @@ fun TelaProgresso(
                         }
                     }
                 } else {
-                    // Estatísticas principais em grade
+                    // ESTATÍSTICAS EM GRADE
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -202,7 +205,7 @@ fun TelaProgresso(
                             value = "${homeState.streakCount}",
                             subtitle = "dias",
                             icon = Icons.Default.LocalFireDepartment,
-                            color = Color(0xFFFF6B35),
+                            color = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7),
                             modifier = Modifier.weight(1f)
                         )
                         StatCard(
@@ -217,7 +220,7 @@ fun TelaProgresso(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // Precisão dividida por tipo
+                    // PRECISÃO
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -234,7 +237,6 @@ fun TelaProgresso(
                             title = "Quiz",
                             percentage = homeState.quizAverageScore.roundToInt(),
                             icon = Icons.Default.Quiz,
-                            // Cor ciano adaptada ao tema, se necessário
                             color = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7),
                             modifier = Modifier.weight(1f)
                         )
@@ -242,14 +244,15 @@ fun TelaProgresso(
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Visão geral com gráfico circular
+                    // VISÃO GERAL
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        // Mantemos a sombra aqui pois é um cartão principal
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Column(
                             modifier = Modifier.padding(24.dp)
@@ -267,7 +270,7 @@ fun TelaProgresso(
                                 Column {
                                     Text(
                                         "Visão Geral",
-                                        fontSize = 20.sp,
+                                        fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
@@ -286,7 +289,6 @@ fun TelaProgresso(
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Gráfico circular
                                 Box(contentAlignment = Alignment.Center) {
                                     CircularProgressBar(
                                         percentage = (realAccuracy * 100).toFloat(),
@@ -297,7 +299,7 @@ fun TelaProgresso(
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
                                             "${(realAccuracy * 100).roundToInt()}%",
-                                            fontSize = 28.sp,
+                                            fontSize = 24.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
@@ -309,7 +311,6 @@ fun TelaProgresso(
                                     }
                                 }
 
-                                // Estatísticas complementares
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
@@ -342,14 +343,15 @@ fun TelaProgresso(
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Atividade semanal
+                    // ATIVIDADE SEMANAL
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        // Mantemos a sombra
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
                             Row(
@@ -365,7 +367,7 @@ fun TelaProgresso(
                                 Column {
                                     Text(
                                         "Atividade Semanal",
-                                        fontSize = 20.sp,
+                                        fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
@@ -388,14 +390,15 @@ fun TelaProgresso(
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Conquistas
+                    // CONQUISTAS (Cartão Pai)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        // Mantemos a sombra no cartão principal
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
                             Row(
@@ -411,7 +414,7 @@ fun TelaProgresso(
                                 Column {
                                     Text(
                                         "Conquistas",
-                                        fontSize = 20.sp,
+                                        fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
@@ -433,7 +436,7 @@ fun TelaProgresso(
                         }
                     }
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(32.dp))
                 }
             }
         }
@@ -455,7 +458,8 @@ fun StatCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        // Sombra suave, sem borda
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(
             modifier = Modifier
@@ -467,7 +471,7 @@ fun StatCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(color.copy(alpha = 0.2f)),
+                    .background(color.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -488,7 +492,7 @@ fun StatCard(
                 )
                 Text(
                     subtitle,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
@@ -511,7 +515,8 @@ fun AccuracyCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        // Sombra suave, sem borda
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(
             modifier = Modifier
@@ -610,7 +615,6 @@ fun CircularProgressBar(
         label = "progress"
     )
 
-    // Cor do track adapta-se ao tema (mais escura no claro, mais clara no escuro)
     val trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
 
     Canvas(
@@ -619,7 +623,6 @@ fun CircularProgressBar(
         val size = this.size.minDimension
         val sweepAngle = (animatedPercentage / 100f) * 360f
 
-        // Background circle
         drawArc(
             color = trackColor,
             startAngle = -90f,
@@ -630,7 +633,6 @@ fun CircularProgressBar(
             topLeft = Offset((this.size.width - size) / 2, (this.size.height - size) / 2)
         )
 
-        // Progress arc
         drawArc(
             color = color,
             startAngle = -90f,
@@ -693,8 +695,8 @@ fun WeeklyActivityChart(weeklyActivity: List<Int>, primaryColor: Color) {
                                     } else {
                                         Brush.verticalGradient(
                                             colors = listOf(
-                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.05f)
                                             )
                                         )
                                     }
@@ -729,7 +731,7 @@ fun AchievementsList(
     accuracy: Double
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Streak achievements
+        // Desbloqueadas
         if (streakCount >= 7) {
             AchievementItem(
                 title = "Semana Completa!",
@@ -750,7 +752,6 @@ fun AchievementsList(
             )
         }
 
-        // Cards studied achievements
         if (cardsStudied >= 50) {
             AchievementItem(
                 title = "Estudante Dedicado",
@@ -761,7 +762,6 @@ fun AchievementsList(
             )
         }
 
-        // Accuracy achievements
         if (accuracy >= 0.9) {
             AchievementItem(
                 title = "Precisão Perfeita",
@@ -772,7 +772,7 @@ fun AchievementsList(
             )
         }
 
-        // Locked achievements
+        // Bloqueadas
         if (streakCount < 7) {
             AchievementItem(
                 title = "Semana Completa",
@@ -812,7 +812,11 @@ fun AchievementItem(
             else
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        // CORREÇÃO:
+        // 1. Removemos 'elevation' para limpar o visual interno (sem sombras sujas).
+        // 2. Adicionamos uma borda MUITO subtil (Variant) para definir o formato sem pesar.
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     ) {
         Row(
             modifier = Modifier

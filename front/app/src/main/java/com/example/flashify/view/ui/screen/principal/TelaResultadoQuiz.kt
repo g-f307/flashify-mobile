@@ -16,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -24,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.view.ui.components.*
 import com.example.flashify.viewmodel.AddContentState
@@ -44,7 +42,7 @@ fun TelaResultadoQuiz(
     viewModel: QuizViewModel,
     deckViewModel: DeckViewModel
 ) {
-    // --- THEME LOGIC ---
+    // --- TEMA ---
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
@@ -60,6 +58,7 @@ fun TelaResultadoQuiz(
     var showAddDialog by remember { mutableStateOf(false) }
     var shouldAutoRedirect by remember { mutableStateOf(false) }
 
+    // VERIFICAR LIMITE DE GERAÇÕES
     val hasGenerationLimit = remember(generationLimitState) {
         if (generationLimitState is GenerationLimitState.Success) {
             val info = (generationLimitState as GenerationLimitState.Success).info
@@ -73,6 +72,7 @@ fun TelaResultadoQuiz(
         viewModel.submitQuiz(quizId, score, correctAnswers, totalQuestions)
     }
 
+    // Fluxo de redirecionamento após sucesso
     LaunchedEffect(addContentState) {
         when (val state = addContentState) {
             is AddContentState.Success -> {
@@ -92,6 +92,7 @@ fun TelaResultadoQuiz(
         }
     }
 
+    // DIÁLOGO COM VERIFICAÇÃO DE LIMITE
     if (showAddDialog) {
         AddContentDialog(
             title = "Adicionar Perguntas",
@@ -113,7 +114,6 @@ fun TelaResultadoQuiz(
         )
     }
 
-    // ✅ Passing isDarkTheme to gradient
     GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -131,17 +131,22 @@ fun TelaResultadoQuiz(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // ✅ PERFORMANCE CARD WITH BORDER
+                // CARD DE PERFORMANCE COM BORDAS
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(8.dp, RoundedCornerShape(20.dp)),
+                        .shadow(
+                            elevation = if (isDarkTheme) 8.dp else 4.dp,
+                            shape = RoundedCornerShape(20.dp)
+                        ),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
-                    // Border added for definition in light mode
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    border = if (!isDarkTheme) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    } else null,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(24.dp),
@@ -179,12 +184,14 @@ fun TelaResultadoQuiz(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height(40.dp)
-                                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                    .background(
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                                    )
                             )
 
                             ResultStatItem(
                                 icon = Icons.Default.Cancel,
-                                label = "Incorretas",
+                                label = "Erradas",
                                 value = "$incorrectAnswers",
                                 color = Color(0xFFF44336)
                             )
@@ -193,10 +200,11 @@ fun TelaResultadoQuiz(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height(40.dp)
-                                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                    .background(
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                                    )
                             )
 
-                            // Blue or theme secondary color
                             val infoColor = if (isDarkTheme) Color(0xFF2196F3) else Color(0xFF0288D1)
                             ResultStatItem(
                                 icon = Icons.Default.Help,
@@ -210,6 +218,7 @@ fun TelaResultadoQuiz(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                // BOTÃO TENTAR NOVAMENTE
                 Button(
                     onClick = onRetry,
                     modifier = Modifier
@@ -227,10 +236,15 @@ fun TelaResultadoQuiz(
                     Text("Tentar Novamente", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
+                // BOTÃO ADICIONAR PERGUNTAS - Debug
+                LaunchedEffect(totalQuestions) {
+                    println("DEBUG TelaResultadoQuiz - totalQuestions: $totalQuestions, mostrando botão: ${totalQuestions < 15}")
+                }
+
                 if (totalQuestions < 15) {
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    val addColor = Color(0xFF26C6DA) // Cyan
+                    val addColor = if (isDarkTheme) Color(0xFF26C6DA) else Color(0xFF00ACC1)
 
                     OutlinedButton(
                         onClick = {
@@ -276,13 +290,25 @@ fun TelaResultadoQuiz(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            // BOTÃO FECHAR
             IconButton(
                 onClick = onFinish,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 12.dp, end = 12.dp)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), CircleShape)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), CircleShape)
+                    .background(
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                        CircleShape
+                    )
+                    .then(
+                        if (!isDarkTheme) {
+                            Modifier.border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                CircleShape
+                            )
+                        } else Modifier
+                    )
                     .size(40.dp)
             ) {
                 Icon(
@@ -292,6 +318,51 @@ fun TelaResultadoQuiz(
                     modifier = Modifier.size(22.dp)
                 )
             }
+        }
+    }
+}
+
+// Componente local para estatísticas
+@Composable
+fun ResultStatItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(color.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = value,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

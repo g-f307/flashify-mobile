@@ -2,6 +2,7 @@ package com.example.flashify.view.ui.screen.principal
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -291,11 +292,11 @@ fun MainContent(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Cabeçalho com ícone
+        // Cabeçalho com ícone - SEM SOMBRA
         Box(
             modifier = Modifier
                 .size(80.dp)
-                .shadow(12.dp, CircleShape)
+                // REMOVIDO: .shadow(12.dp, CircleShape) que causava a mancha no modo claro
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(

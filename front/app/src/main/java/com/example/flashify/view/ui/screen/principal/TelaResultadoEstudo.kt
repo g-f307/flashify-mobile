@@ -16,17 +16,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.view.ui.components.*
+import com.example.flashify.view.ui.theme.YellowAccent
 import com.example.flashify.viewmodel.AddContentState
 import com.example.flashify.viewmodel.DeckViewModel
 import com.example.flashify.viewmodel.GenerationLimitState
@@ -41,7 +40,7 @@ fun TelaResultadoEstudo(
     onFinish: () -> Unit,
     deckViewModel: DeckViewModel
 ) {
-    // --- LÓGICA DO TEMA ---
+    // --- TEMA ---
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
@@ -56,6 +55,7 @@ fun TelaResultadoEstudo(
     var showAddDialog by remember { mutableStateOf(false) }
     var shouldAutoRedirect by remember { mutableStateOf(false) }
 
+    // VERIFICAR LIMITE DE GERAÇÕES
     val hasGenerationLimit = remember(generationLimitState) {
         if (generationLimitState is GenerationLimitState.Success) {
             val info = (generationLimitState as GenerationLimitState.Success).info
@@ -65,6 +65,7 @@ fun TelaResultadoEstudo(
         }
     }
 
+    // Fluxo de redirecionamento após sucesso
     LaunchedEffect(addContentState) {
         when (val state = addContentState) {
             is AddContentState.Success -> {
@@ -84,6 +85,7 @@ fun TelaResultadoEstudo(
         }
     }
 
+    // DIÁLOGO COM VERIFICAÇÃO DE LIMITE
     if (showAddDialog) {
         AddContentDialog(
             title = "Adicionar Flashcards",
@@ -105,7 +107,6 @@ fun TelaResultadoEstudo(
         )
     }
 
-    // ✅ Passamos isDarkTheme para o gradiente
     GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -123,68 +124,87 @@ fun TelaResultadoEstudo(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // ✅ CARD DE PERFORMANCE COM BORDA
+                // CARD DE PERFORMANCE COM BORDAS
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(8.dp, RoundedCornerShape(20.dp)),
+                        .shadow(
+                            elevation = if (isDarkTheme) 8.dp else 4.dp,
+                            shape = RoundedCornerShape(20.dp)
+                        ),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
-                    // Borda adicionada para definição no modo claro
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    border = if (!isDarkTheme) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    } else null,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .padding(vertical = 24.dp, horizontal = 20.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         CircularPerformanceChart(
                             percentage = accuracy,
                             color = if (score >= 80) Color(0xFF4CAF50) else primaryColor
                         )
 
-                        Spacer(modifier = Modifier.height(24.dp))
-
                         Divider(
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
                             thickness = 1.dp
                         )
-
-                        Spacer(modifier = Modifier.height(24.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            ResultStatItem(Icons.Default.School, "Dominados", "$knownCards", Color(0xFF4CAF50))
-
+                            StatItem(
+                                Icons.Default.School,
+                                "Dominados",
+                                "$knownCards",
+                                Color(0xFF4CAF50)
+                            )
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
-                                    .height(40.dp)
-                                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                    .height(48.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                                    )
                             )
-
-                            ResultStatItem(Icons.Default.MenuBook, "A Revisar", "$learningCards", primaryColor)
-
+                            StatItem(
+                                Icons.Default.MenuBook,
+                                "Revisando",
+                                "$learningCards",
+                                primaryColor
+                            )
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
-                                    .height(40.dp)
-                                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                    .height(48.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                                    )
                             )
-
-                            // Azul ou cor secundária do tema
                             val infoColor = if (isDarkTheme) Color(0xFF2196F3) else Color(0xFF0288D1)
-                            ResultStatItem(Icons.Default.Layers, "Total", "$totalCards", infoColor)
+                            StatItem(
+                                Icons.Default.Layers,
+                                "Total",
+                                "$totalCards",
+                                infoColor
+                            )
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                // BOTÃO REINICIAR
                 Button(
                     onClick = onRestart,
                     modifier = Modifier
@@ -202,17 +222,26 @@ fun TelaResultadoEstudo(
                     Text("Reiniciar Deck", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
+                // BOTÃO ADICIONAR FLASHCARDS - Debug
+                LaunchedEffect(totalCards) {
+                    println("DEBUG TelaResultadoEstudo - totalCards: $totalCards, mostrando botão: ${totalCards < 20}")
+                }
+
                 if (totalCards < 20) {
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    val addColor = Color(0xFF26C6DA) // Ciano
+                    val addColor = if (isDarkTheme) Color(0xFF26C6DA) else Color(0xFF00ACC1)
 
                     OutlinedButton(
                         onClick = {
                             if (!hasGenerationLimit) {
                                 showAddDialog = true
                             } else {
-                                Toast.makeText(context, "Limite diário de gerações atingido!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "Limite diário de gerações atingido!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         },
                         modifier = Modifier
@@ -247,14 +276,22 @@ fun TelaResultadoEstudo(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            // BOTÃO FECHAR
             IconButton(
                 onClick = onFinish,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 12.dp, end = 12.dp)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), CircleShape)
-                    // Adicionada borda subtil ao botão de fechar
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), CircleShape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f), CircleShape)
+                    .then(
+                        if (!isDarkTheme) {
+                            Modifier.border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                CircleShape
+                            )
+                        } else Modifier
+                    )
                     .size(40.dp)
             ) {
                 Icon(
@@ -265,35 +302,5 @@ fun TelaResultadoEstudo(
                 )
             }
         }
-    }
-}
-
-// ✅ Componente local para garantir o estilo correto dos itens de estatística
-@Composable
-fun ResultStatItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String,
-    color: Color
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = value,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

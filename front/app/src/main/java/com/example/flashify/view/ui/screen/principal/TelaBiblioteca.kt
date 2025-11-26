@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +36,7 @@ import com.example.flashify.model.util.*
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
 import com.example.flashify.viewmodel.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun TelaPrincipalBiblioteca(
@@ -42,28 +44,27 @@ fun TelaPrincipalBiblioteca(
     deckViewModel: DeckViewModel = hiltViewModel(),
     folderViewModel: FolderViewModel = hiltViewModel()
 ) {
-    // --- LÓGICA DO TEMA (Igual à TelaPrincipal) ---
+    // --- LÓGICA DO TEMA ---
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     val deckActionState by deckViewModel.deckActionState.collectAsStateWithLifecycle()
     val libraryState by folderViewModel.libraryState.collectAsStateWithLifecycle()
     val folderOperationState by folderViewModel.operationState.collectAsStateWithLifecycle()
 
-    // Estados para diálogos de DECK
+    // Estados para diálogos
     var showDeleteDeckDialog by remember { mutableStateOf(false) }
     var showEditDeckDialog by remember { mutableStateOf(false) }
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var showMoveToPastaDialog by remember { mutableStateOf(false) }
     var deckToActOn by remember { mutableStateOf<DeckResponse?>(null) }
 
-    // Estados para diálogos de PASTA
     var showEditFolderDialog by remember { mutableStateOf(false) }
     var showDeleteFolderDialog by remember { mutableStateOf(false) }
     var folderToActOn by remember { mutableStateOf<FolderWithDocumentsResponse?>(null) }
 
-    // Carregar biblioteca ao iniciar
     LaunchedEffect(Unit) {
         folderViewModel.loadLibrary()
     }
@@ -99,7 +100,7 @@ fun TelaPrincipalBiblioteca(
         }
     }
 
-    // Diálogos de DECK
+    // Diálogos
     if (showDeleteDeckDialog && deckToActOn != null) {
         DeleteDeckDialog(
             deckName = deckToActOn!!.filePath,
@@ -127,7 +128,6 @@ fun TelaPrincipalBiblioteca(
         )
     }
 
-    // Diálogos de PASTA
     if (showEditFolderDialog && folderToActOn != null) {
         EditFolderDialog(
             currentName = folderToActOn!!.name,
@@ -154,7 +154,6 @@ fun TelaPrincipalBiblioteca(
         )
     }
 
-    // Navegação
     var selectedItem by remember { mutableStateOf(1) }
     val navItems = listOf(
         NavItem("Início", Icons.Default.Home),
@@ -185,67 +184,22 @@ fun TelaPrincipalBiblioteca(
             }
         }
     ) { innerPadding ->
-        // ✅ PASSANDO isDarkTheme CORRETAMENTE
         GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
             when (val state = libraryState) {
                 is LibraryState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 3.dp,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                "Carregando biblioteca...",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp
-                            )
-                        }
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = primaryColor)
                     }
                 }
                 is LibraryState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ErrorOutline,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                "Erro ao carregar",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                state.message,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                fontSize = 14.sp
-                            )
-                            Spacer(Modifier.height(24.dp))
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(state.message, color = MaterialTheme.colorScheme.error)
                             Button(
                                 onClick = { folderViewModel.loadLibrary() },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                shape = RoundedCornerShape(12.dp)
+                                colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
                             ) {
-                                Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onPrimary)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Tentar Novamente", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                                Text("Tentar Novamente", color = MaterialTheme.colorScheme.onPrimary)
                             }
                         }
                     }
@@ -258,145 +212,78 @@ fun TelaPrincipalBiblioteca(
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        item(key = "headerSection") {
+                        // Cabeçalho
+                        item {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    "Sua Biblioteca",
-                                    fontSize = 28.sp,
+                                    "Biblioteca",
+                                    style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    letterSpacing = 0.3.sp
+                                    color = MaterialTheme.colorScheme.onBackground
                                 )
-                                Spacer(Modifier.height(4.dp))
                                 Text(
                                     "${state.library.folders.size} pastas · ${state.library.rootDocuments.size} decks",
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    letterSpacing = 0.2.sp
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
-                        item(key = "actionButtons") {
-                            Spacer(modifier = Modifier.height(8.dp))
+                        // Botões de Ação
+                        item {
                             ActionButtons(
                                 onCreateFolderClick = { showCreateFolderDialog = true },
                                 onCreateDeckClick = { navController.navigate(CREATE_FLASHCARD_ROUTE) }
                             )
                         }
 
+                        // Seção Pastas
                         if (state.library.folders.isNotEmpty()) {
-                            item(key = "foldersTitle") {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Pastas",
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.3.sp
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                    ) {
-                                        Text(
-                                            "${state.library.folders.size}",
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                }
+                            item {
+                                Text(
+                                    "Pastas",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
                             }
-
-                            items(
-                                items = state.library.folders,
-                                key = { folder -> "Folder-${folder.id}" }
-                            ) { folder ->
+                            items(state.library.folders) { folder ->
                                 FolderItemWithMenu(
                                     folder = folder,
-                                    onClick = {
-                                        navController.navigate("$DETALHE_PASTA_ROUTE/${folder.id}/${folder.name}")
-                                    },
-                                    onEditClick = {
-                                        folderToActOn = folder
-                                        showEditFolderDialog = true
-                                    },
-                                    onDeleteClick = {
-                                        folderToActOn = folder
-                                        showDeleteFolderDialog = true
-                                    }
+                                    onClick = { navController.navigate("$DETALHE_PASTA_ROUTE/${folder.id}/${folder.name}") },
+                                    onEditClick = { folderToActOn = folder; showEditFolderDialog = true },
+                                    onDeleteClick = { folderToActOn = folder; showDeleteFolderDialog = true }
                                 )
                             }
                         }
 
-                        item(key = "decksTitle") {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Seus Decks",
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.3.sp
-                                )
-                                if (state.library.rootDocuments.isNotEmpty()) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                    ) {
-                                        Text(
-                                            "${state.library.rootDocuments.size}",
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                }
-                            }
+                        // Seção Decks
+                        item {
+                            Text(
+                                "Seus Decks",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
                         }
 
                         if (state.library.rootDocuments.isEmpty()) {
-                            item(key = "emptyState") {
-                                EmptyStateDecks(onCreateClick = { navController.navigate(CREATE_FLASHCARD_ROUTE) })
-                            }
+                            item { EmptyStateDecks { navController.navigate(CREATE_FLASHCARD_ROUTE) } }
                         } else {
-                            items(
-                                items = state.library.rootDocuments,
-                                key = { deck -> "Deck-${deck.id}" }
-                            ) { deck ->
+                            items(state.library.rootDocuments) { deck ->
                                 DeckItemCard(
                                     deck = deck,
-                                    onStudyClick = {
-                                        navController.navigate("$ESCOLHA_MODO_ESTUDO_ROUTE/${deck.id}")
-                                    },
-                                    onEditClick = {
-                                        deckToActOn = deck
-                                        showEditDeckDialog = true
-                                    },
-                                    onDeleteClick = {
-                                        deckToActOn = deck
-                                        showDeleteDeckDialog = true
-                                    },
-                                    onMoveToPastaClick = {
-                                        deckToActOn = deck
-                                        showMoveToPastaDialog = true
-                                    }
+                                    onStudyClick = { navController.navigate("$ESCOLHA_MODO_ESTUDO_ROUTE/${deck.id}") },
+                                    onEditClick = { deckToActOn = deck; showEditDeckDialog = true },
+                                    onDeleteClick = { deckToActOn = deck; showDeleteDeckDialog = true },
+                                    onMoveToPastaClick = { deckToActOn = deck; showMoveToPastaDialog = true }
                                 )
                             }
                         }
-                        item(key = "finalSpacer") { Spacer(Modifier.height(16.dp)) }
+
+                        item { Spacer(Modifier.height(80.dp)) }
                     }
                 }
                 else -> {}
@@ -419,13 +306,10 @@ fun FolderItemWithMenu(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        // ✅ Borda adicionada para definição no modo claro
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            .shadow(4.dp, RoundedCornerShape(20.dp)), // Mesmo arredondamento do Deck
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     ) {
         Row(
             modifier = Modifier
@@ -438,328 +322,66 @@ fun FolderItemWithMenu(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
+                // Ícone de Pasta
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(primaryColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                        .size(44.dp) // Tamanho consistente com Deck
+                        .background(primaryColor.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Folder,
+                        imageVector = Icons.Outlined.Folder,
                         contentDescription = null,
                         tint = primaryColor,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         folder.name,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 16.sp,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        letterSpacing = 0.2.sp
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Description,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "${folder.documents.size} deck${if (folder.documents.size != 1) "s" else ""}",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Text(
+                        "${folder.documents.size} decks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
             Box {
                 IconButton(
                     onClick = { showMenu = true },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(24.dp)
                 ) {
                     Icon(
                         Icons.Default.MoreVert,
                         "Opções",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                        modifier = Modifier.size(22.dp)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
-                    shape = RoundedCornerShape(12.dp),
                     containerColor = MaterialTheme.colorScheme.surface
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Renomear", fontSize = 14.sp, fontWeight = FontWeight.Medium) },
+                        text = { Text("Renomear") },
                         onClick = { showMenu = false; onEditClick() },
-                        leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp)) }
+                        leadingIcon = { Icon(Icons.Default.Edit, null) }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                     DropdownMenuItem(
-                        text = { Text("Excluir", color = MaterialTheme.colorScheme.error, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
+                        text = { Text("Excluir", color = MaterialTheme.colorScheme.error) },
                         onClick = { showMenu = false; onDeleteClick() },
-                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp)) }
+                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun EditFolderDialog(currentName: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit, isLoading: Boolean) {
-    var newName by remember { mutableStateOf(currentName) }
-    val primaryColor = MaterialTheme.colorScheme.primary
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Renomear Pasta", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                Text("Digite o novo nome:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    label = { Text("Novo nome") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = primaryColor,
-                        cursorColor = primaryColor,
-                        focusedLabelColor = primaryColor
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(newName) },
-                enabled = !isLoading && newName.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                else Text("Salvar", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading, shape = RoundedCornerShape(10.dp)) {
-                Text("Cancelar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        },
-        shape = RoundedCornerShape(20.dp),
-        containerColor = MaterialTheme.colorScheme.surface
-    )
-}
-
-// ... DeleteFolderDialog mantém a mesma lógica, substituindo TextSecondary por onSurfaceVariant ...
-@Composable
-fun DeleteFolderDialog(folderName: String, deckCount: Int, onConfirm: (Boolean) -> Unit, onDismiss: () -> Unit, isLoading: Boolean) {
-    var deleteDecks by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp)) },
-        title = { Text("Excluir Pasta", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                Text("Tem certeza que deseja excluir a pasta:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
-                ) {
-                    Text("\"$folderName\"", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
-                }
-
-                if (deckCount > 0) {
-                    Spacer(Modifier.height(16.dp))
-                    Text("Esta pasta contém $deckCount deck${if (deckCount != 1) "s" else ""}.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { deleteDecks = !deleteDecks }.padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = deleteDecks,
-                            onCheckedChange = { deleteDecks = it },
-                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.error, uncheckedColor = MaterialTheme.colorScheme.outline)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text("Excluir os decks junto com a pasta", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                            Text(if (deleteDecks) "Os decks serão apagados permanentemente" else "Os decks serão movidos para a biblioteca", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(deleteDecks) },
-                enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                else Text("Excluir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading, shape = RoundedCornerShape(10.dp)) {
-                Text("Cancelar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        },
-        shape = RoundedCornerShape(20.dp),
-        containerColor = MaterialTheme.colorScheme.surface
-    )
-}
-
-@Composable
-fun MoveToPastaDialog(folders: List<FolderWithDocumentsResponse>, currentFolderId: Int?, onConfirm: (Int?) -> Unit, onDismiss: () -> Unit) {
-    var selectedFolderId by remember { mutableStateOf<Int?>(null) }
-    val primaryColor = MaterialTheme.colorScheme.primary
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Mover para Pasta", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text("Selecione a pasta de destino:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(16.dp))
-
-                if (currentFolderId != null) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { selectedFolderId = null },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selectedFolderId == null) primaryColor.copy(alpha = 0.15f) else Color.Transparent,
-                        border = BorderStroke(1.dp, if (selectedFolderId == null) primaryColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = selectedFolderId == null, onClick = { selectedFolderId = null }, colors = RadioButtonDefaults.colors(selectedColor = primaryColor))
-                            Spacer(Modifier.width(8.dp))
-                            Icon(Icons.Default.Home, null, tint = if (selectedFolderId == null) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Raiz (sem pasta)", fontWeight = if (selectedFolderId == null) FontWeight.Bold else FontWeight.Normal, color = if (selectedFolderId == null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-
-                folders.filter { it.id != currentFolderId }.forEach { folder ->
-                    Spacer(Modifier.height(8.dp))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable { selectedFolderId = folder.id },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selectedFolderId == folder.id) primaryColor.copy(alpha = 0.15f) else Color.Transparent,
-                        border = BorderStroke(1.dp, if (selectedFolderId == folder.id) primaryColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = selectedFolderId == folder.id, onClick = { selectedFolderId = folder.id }, colors = RadioButtonDefaults.colors(selectedColor = primaryColor))
-                            Spacer(Modifier.width(8.dp))
-                            Icon(Icons.Default.Folder, null, tint = if (selectedFolderId == folder.id) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(folder.name, fontWeight = if (selectedFolderId == folder.id) FontWeight.Bold else FontWeight.Normal, color = if (selectedFolderId == folder.id) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(selectedFolderId) },
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("Mover", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) {
-                Text("Cancelar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        },
-        shape = RoundedCornerShape(20.dp),
-        containerColor = MaterialTheme.colorScheme.surface
-    )
-}
-
-@Composable
-fun ActionButtons(onCreateFolderClick: () -> Unit, onCreateDeckClick: () -> Unit) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedButton(
-            onClick = onCreateFolderClick,
-            modifier = Modifier.weight(1f).height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-        ) {
-            Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Nova Pasta", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.3.sp)
-        }
-
-        Button(
-            onClick = onCreateDeckClick,
-            modifier = Modifier.weight(1f).height(52.dp).shadow(4.dp, RoundedCornerShape(14.dp)),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimary)
-            Spacer(Modifier.width(8.dp))
-            Text("Novo Deck", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary, fontSize = 14.sp, letterSpacing = 0.3.sp)
-        }
-    }
-}
-
-@Composable
-fun EmptyStateDecks(onCreateClick: () -> Unit) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
-                modifier = Modifier.size(80.dp).background(primaryColor.copy(alpha = 0.15f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(imageVector = Icons.Default.LibraryBooks, contentDescription = null, tint = primaryColor, modifier = Modifier.size(40.dp))
-            }
-            Spacer(Modifier.height(20.dp))
-            Text("Nenhum deck criado ainda", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(8.dp))
-            Text("Crie seu primeiro deck para começar a estudar", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 20.sp)
-            Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onCreateClick,
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.height(48.dp)
-            ) {
-                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onPrimary)
-                Spacer(Modifier.width(8.dp))
-                Text("Criar Primeiro Deck", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
     }
@@ -776,113 +398,240 @@ fun DeckItemCard(
     var showMenu by remember { mutableStateOf(false) }
     val primaryColor = MaterialTheme.colorScheme.primary
     val isDarkTheme = isSystemInDarkTheme()
-    // Adaptação da cor do Quiz (igual à TelaPrincipal)
     val quizColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
 
     Card(
-        modifier = Modifier.fillMaxWidth().shadow(4.dp, RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(20.dp)),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        // ✅ Borda adicionada
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+        // Borda subtil para definição no modo claro
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     ) {
-        Column(Modifier.padding(18.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier.size(48.dp).background(primaryColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Topo: Ícone, Badges e Menu
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                // Ícone do Deck
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(primaryColor.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.MenuBook,
+                        contentDescription = null,
+                        tint = primaryColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // Badges e Menu (Agrupados)
+                Row(verticalAlignment = Alignment.Top) {
+                    // Badges (Empilhados verticalmente)
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
-                        Icon(Icons.Default.MenuBook, contentDescription = "Deck", tint = primaryColor, modifier = Modifier.size(26.dp))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = deck.filePath,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            letterSpacing = 0.2.sp,
-                            lineHeight = 22.sp
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (deck.totalFlashcards > 0) {
-                                Surface(shape = RoundedCornerShape(8.dp), color = primaryColor.copy(alpha = 0.2f)) {
-                                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Style, contentDescription = null, tint = primaryColor, modifier = Modifier.size(12.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("${deck.totalFlashcards}", fontSize = 12.sp, color = primaryColor, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                            if (deck.hasQuiz) {
-                                Surface(shape = RoundedCornerShape(8.dp), color = quizColor.copy(alpha = 0.2f)) {
-                                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Quiz, contentDescription = null, tint = quizColor, modifier = Modifier.size(12.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Quiz", fontSize = 12.sp, color = quizColor, fontWeight = FontWeight.Bold)
-                                    }
-                                }
+                        // Badge Flashcards
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = primaryColor.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                "Flashcards",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                // Cor escura no modo claro para leitura
+                                color = if (!isDarkTheme) Color(0xFFF57F17) else primaryColor
+                            )
+                        }
+
+                        // Badge Quiz
+                        if (deck.hasQuiz) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = quizColor.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, quizColor.copy(alpha = 0.3f))
+                            ) {
+                                Text(
+                                    "Quiz",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = quizColor
+                                )
                             }
                         }
                     }
-                }
 
-                Box {
-                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.MoreVert, "Opções", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), modifier = Modifier.size(22.dp))
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        shape = RoundedCornerShape(12.dp),
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Editar", fontSize = 14.sp, fontWeight = FontWeight.Medium) },
-                            onClick = { showMenu = false; onEditClick() },
-                            leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp)) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Mover para Pasta", fontSize = 14.sp, fontWeight = FontWeight.Medium) },
-                            onClick = { showMenu = false; onMoveToPastaClick() },
-                            leadingIcon = { Icon(Icons.Default.Folder, null, modifier = Modifier.size(20.dp)) }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                        DropdownMenuItem(
-                            text = { Text("Excluir", color = MaterialTheme.colorScheme.error, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
-                            onClick = { showMenu = false; onDeleteClick() },
-                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp)) }
-                        )
+                    // Menu de Opções (Três pontinhos)
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                "Opções",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Editar") },
+                                onClick = { showMenu = false; onEditClick() },
+                                leadingIcon = { Icon(Icons.Default.Edit, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Mover") },
+                                onClick = { showMenu = false; onMoveToPastaClick() },
+                                leadingIcon = { Icon(Icons.Default.Folder, null) }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Excluir", color = MaterialTheme.colorScheme.error) },
+                                onClick = { showMenu = false; onDeleteClick() },
+                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
+            // Título do Deck
+            Text(
+                text = deck.filePath,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 20.sp
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // Botão SÓLIDO (Preenchido) para Acessar
             Button(
                 onClick = onStudyClick,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp),
+                contentPadding = PaddingValues(0.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = primaryColor,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
-                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Estudar", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Estudar Agora", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 0.3.sp)
-                }
+                Text(
+                    "Acessar Deck",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    Icons.Default.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
     }
 }
 
-// ... CreateFolderDialog, EditDeckDialog e DeleteDeckDialog permanecem com a mesma estrutura ...
-// Apenas garanta que eles usem MaterialTheme.colorScheme.primary onde antes era YellowAccent
-// e onSurfaceVariant onde era TextSecondary, como fiz nas funções acima.
+@Composable
+fun ActionButtons(onCreateFolderClick: () -> Unit, onCreateDeckClick: () -> Unit) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(
+            onClick = onCreateFolderClick,
+            modifier = Modifier.weight(1f).height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        ) {
+            Icon(Icons.Default.CreateNewFolder, null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Nova Pasta", fontWeight = FontWeight.SemiBold)
+        }
+
+        Button(
+            onClick = onCreateDeckClick,
+            modifier = Modifier.weight(1f).height(52.dp).shadow(4.dp, RoundedCornerShape(14.dp)),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+        ) {
+            Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimary)
+            Spacer(Modifier.width(8.dp))
+            Text("Novo Deck", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+        }
+    }
+}
+
+@Composable
+fun EmptyStateDecks(onCreateClick: () -> Unit) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier.size(80.dp).background(primaryColor.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = Icons.Default.LibraryBooks, contentDescription = null, tint = primaryColor, modifier = Modifier.size(40.dp))
+            }
+            Spacer(Modifier.height(20.dp))
+            Text("Nenhum deck criado ainda", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Text("Crie seu primeiro deck para começar a estudar", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = onCreateClick,
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor, contentColor = MaterialTheme.colorScheme.onPrimary),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.height(48.dp)
+            ) {
+                Icon(Icons.Default.Add, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Criar Primeiro Deck", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// Dialogs Components (CreateFolderDialog, EditDeckDialog, etc.)
+// Certifique-se de que eles usem MaterialTheme.colorScheme.primary e onSurfaceVariant.
+// O código abaixo é um exemplo genérico para eles:
+
 @Composable
 fun CreateFolderDialog(onConfirm: (String) -> Unit, onCancel: () -> Unit) {
     var folderName by remember { mutableStateOf("") }
@@ -890,38 +639,33 @@ fun CreateFolderDialog(onConfirm: (String) -> Unit, onCancel: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Nova Pasta", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+        title = { Text("Nova Pasta", fontWeight = FontWeight.Bold) },
         text = {
-            Column {
-                Text("Digite o nome da pasta:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = folderName,
-                    onValueChange = { folderName = it },
-                    label = { Text("Nome da pasta") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryColor, cursorColor = primaryColor, focusedLabelColor = primaryColor),
-                    modifier = Modifier.fillMaxWidth()
+            OutlinedTextField(
+                value = folderName,
+                onValueChange = { folderName = it },
+                label = { Text("Nome da pasta") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primaryColor,
+                    focusedLabelColor = primaryColor,
+                    cursorColor = primaryColor
                 )
-            }
+            )
         },
         confirmButton = {
             Button(
                 onClick = { onConfirm(folderName) },
                 enabled = folderName.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                shape = RoundedCornerShape(10.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = primaryColor, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
-                Text("Criar", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("Criar", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel, shape = RoundedCornerShape(10.dp)) {
-                Text("Cancelar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
+            TextButton(onClick = onCancel) { Text("Cancelar") }
         },
-        shape = RoundedCornerShape(20.dp),
         containerColor = MaterialTheme.colorScheme.surface
     )
 }
@@ -933,40 +677,22 @@ fun EditDeckDialog(currentName: String, onConfirm: (String) -> Unit, onDismiss: 
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Editar Nome do Deck", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+        title = { Text("Editar Nome") },
         text = {
-            Column {
-                Text("Digite o novo nome:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    label = { Text("Novo nome") },
-                    singleLine = true,
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryColor, cursorColor = primaryColor, focusedLabelColor = primaryColor),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            OutlinedTextField(
+                value = newName,
+                onValueChange = { newName = it },
+                label = { Text("Novo nome") },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryColor, focusedLabelColor = primaryColor)
+            )
         },
         confirmButton = {
-            Button(
-                onClick = { onConfirm(newName) },
-                enabled = !isLoading && newName.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                else Text("Salvar", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Button(onClick = { onConfirm(newName) }, enabled = !isLoading && newName.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = primaryColor, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary) else Text("Salvar")
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading, shape = RoundedCornerShape(10.dp)) {
-                Text("Cancelar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        },
-        shape = RoundedCornerShape(20.dp),
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
         containerColor = MaterialTheme.colorScheme.surface
     )
 }
@@ -975,40 +701,112 @@ fun EditDeckDialog(currentName: String, onConfirm: (String) -> Unit, onDismiss: 
 fun DeleteDeckDialog(deckName: String, onConfirm: () -> Unit, onDismiss: () -> Unit, isLoading: Boolean) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp)) },
-        title = { Text("Excluir Deck", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+        icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text("Excluir Deck") },
+        text = { Text("Tem certeza que deseja excluir \"$deckName\"? Esta ação não pode ser desfeita.") },
+        confirmButton = {
+            Button(onClick = onConfirm, enabled = !isLoading, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White) else Text("Excluir", color = Color.White)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+}
+
+@Composable
+fun EditFolderDialog(currentName: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit, isLoading: Boolean) {
+    var newName by remember { mutableStateOf(currentName) }
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Renomear Pasta") },
+        text = {
+            OutlinedTextField(
+                value = newName,
+                onValueChange = { newName = it },
+                label = { Text("Novo nome") },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = primaryColor, focusedLabelColor = primaryColor)
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(newName) }, enabled = !isLoading && newName.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = primaryColor, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary) else Text("Salvar")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+}
+
+@Composable
+fun DeleteFolderDialog(folderName: String, deckCount: Int, onConfirm: (Boolean) -> Unit, onDismiss: () -> Unit, isLoading: Boolean) {
+    var deleteDecks by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text("Excluir Pasta") },
         text = {
             Column {
-                Text("Tem certeza que deseja excluir o deck:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
-                ) {
-                    Text("\"$deckName\"", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
+                Text("Tem certeza que deseja excluir \"$folderName\"?")
+                if (deckCount > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = deleteDecks, onCheckedChange = { deleteDecks = it }, colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.error))
+                        Text("Excluir também os $deckCount decks contidos", fontSize = 13.sp)
+                    }
                 }
-                Spacer(Modifier.height(12.dp))
-                Text("Esta ação não pode ser desfeita.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
             }
         },
         confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                else Text("Excluir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Button(onClick = { onConfirm(deleteDecks) }, enabled = !isLoading, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White) else Text("Excluir", color = Color.White)
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading, shape = RoundedCornerShape(10.dp)) {
-                Text("Cancelar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+}
+
+@Composable
+fun MoveToPastaDialog(folders: List<FolderWithDocumentsResponse>, currentFolderId: Int?, onConfirm: (Int?) -> Unit, onDismiss: () -> Unit) {
+    var selectedFolderId by remember { mutableStateOf<Int?>(null) }
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mover para Pasta") },
+        text = {
+            Column {
+                Text("Selecione o destino:")
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable { selectedFolderId = null },
+                    color = if (selectedFolderId == null) primaryColor.copy(alpha = 0.1f) else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Raiz (Sem pasta)", modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSurface)
+                }
+                folders.filter { it.id != currentFolderId }.forEach { folder ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable { selectedFolderId = folder.id },
+                        color = if (selectedFolderId == folder.id) primaryColor.copy(alpha = 0.1f) else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(folder.name, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
             }
         },
-        shape = RoundedCornerShape(20.dp),
+        confirmButton = {
+            Button(onClick = { onConfirm(selectedFolderId) }, colors = ButtonDefaults.buttonColors(containerColor = primaryColor, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                Text("Mover")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
         containerColor = MaterialTheme.colorScheme.surface
     )
 }

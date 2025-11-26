@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -99,7 +100,7 @@ fun TelaContentLoader(
         }
     }
 
-    // ✅ Passando isDarkTheme para o gradiente
+    // ✅ Passamos isDarkTheme para o gradiente
     GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
         Scaffold(
             containerColor = Color.Transparent
@@ -258,7 +259,9 @@ fun HeaderSection(
                             primaryColor.copy(alpha = 0.1f)
                         )
                     )
-                ),
+                )
+                // ✅ Sem sombra, apenas borda subtil para definição
+                .border(1.dp, primaryColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -358,10 +361,16 @@ fun ProcessingStepItem(
         visible = true
     }
 
-    // Cores adaptadas ao tema
+    // Cores adaptadas ao tema (Flat Design)
     val backgroundColor = when (status) {
-        StepStatus.ACTIVE -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-        StepStatus.COMPLETED -> MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+        StepStatus.ACTIVE -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        StepStatus.COMPLETED -> MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+        else -> Color.Transparent
+    }
+
+    val borderColor = when (status) {
+        StepStatus.ACTIVE -> primaryColor.copy(alpha = 0.5f)
+        StepStatus.COMPLETED -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
         else -> Color.Transparent
     }
 
@@ -378,13 +387,10 @@ fun ProcessingStepItem(
                 containerColor = backgroundColor
             ),
             shape = RoundedCornerShape(12.dp),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = if (status == StepStatus.ACTIVE) 1.dp else 0.dp
-            ),
-            // ✅ Borda adicionada para modo claro
-            border = if (status == StepStatus.ACTIVE || status == StepStatus.COMPLETED)
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-            else null
+            // ✅ REMOVIDA TODA A SOMBRA (Zero Elevation)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            // ✅ Borda adicionada para definição sem sombra
+            border = if (status != StepStatus.PENDING) BorderStroke(1.dp, borderColor) else null
         ) {
             Row(
                 modifier = Modifier
@@ -426,6 +432,8 @@ fun ProcessingStepItem(
 
 @Composable
 fun StatusIndicator(status: StepStatus) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     when (status) {
         StepStatus.COMPLETED -> {
             Icon(
@@ -438,7 +446,7 @@ fun StatusIndicator(status: StepStatus) {
         StepStatus.ACTIVE -> {
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
-                color = MaterialTheme.colorScheme.primary,
+                color = primaryColor,
                 strokeWidth = 2.dp
             )
         }
@@ -447,7 +455,7 @@ fun StatusIndicator(status: StepStatus) {
                 modifier = Modifier
                     .size(18.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             )
         }
     }
@@ -459,17 +467,18 @@ fun StepIcon(
     status: StepStatus
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     val iconBackgroundColor = when (status) {
         StepStatus.ACTIVE -> primaryColor.copy(alpha = 0.15f)
-        StepStatus.COMPLETED -> Color.Green.copy(alpha = 0.15f)
-        StepStatus.PENDING -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        StepStatus.COMPLETED -> Color.Green.copy(alpha = 0.1f)
+        StepStatus.PENDING -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
     }
 
     val iconTint = when (status) {
         StepStatus.ACTIVE -> primaryColor
         StepStatus.COMPLETED -> Color.Green
-        StepStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        StepStatus.PENDING -> onSurfaceVariant.copy(alpha = 0.5f)
     }
 
     Box(
@@ -503,11 +512,12 @@ fun CompletedMessage() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
             ),
             shape = RoundedCornerShape(14.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            // ✅ Borda adicionada
+            // ✅ Sem sombra
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            // ✅ Borda verde
             border = BorderStroke(1.dp, Color.Green.copy(alpha = 0.3f))
         ) {
             Row(
@@ -562,11 +572,12 @@ fun ErrorMessage(message: String) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
             ),
             shape = RoundedCornerShape(14.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            // ✅ Borda adicionada
+            // ✅ Sem sombra
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            // ✅ Borda vermelha
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
         ) {
             Row(

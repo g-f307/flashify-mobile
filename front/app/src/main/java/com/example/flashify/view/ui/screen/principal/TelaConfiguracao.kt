@@ -44,19 +44,15 @@ fun TelaPrincipalConfiguracao(
 
     // --- LÓGICA DO TEMA ---
     val themeManager = remember { ThemeManager(context) }
-    // O switch agora reflete o estado real da app
     val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
 
     val tokenManager = remember { TokenManager(context) }
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
 
-    // Estados locais
-    var notificationsEnabled by remember { mutableStateOf(true) }
-    var soundEnabled by remember { mutableStateOf(false) }
-
     // Cores do Tema
     val primaryColor = MaterialTheme.colorScheme.primary
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val cyanColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
 
     var selectedItem by remember { mutableStateOf(4) }
     val navItems = listOf(
@@ -88,7 +84,6 @@ fun TelaPrincipalConfiguracao(
             }
         }
     ) { innerPadding ->
-        // ✅ Passamos isDarkTheme para o fundo funcionar corretamente
         GradientBackgroundScreen(isDarkTheme = isDarkTheme) {
             LazyColumn(
                 modifier = Modifier
@@ -126,8 +121,7 @@ fun TelaPrincipalConfiguracao(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        // ✅ Borda adicionada
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
                         Box(
                             modifier = Modifier
@@ -144,50 +138,37 @@ fun TelaPrincipalConfiguracao(
                                 }
                                 is UserState.Success -> {
                                     val user = state.user
-                                    Column(
+                                    Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .clip(CircleShape)
+                                                .background(primaryColor.copy(alpha = 0.2f)),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(64.dp)
-                                                    .clip(CircleShape)
-                                                    .background(primaryColor.copy(alpha = 0.2f)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.AccountCircle,
-                                                    contentDescription = "Foto de Perfil",
-                                                    modifier = Modifier.size(40.dp),
-                                                    tint = primaryColor
-                                                )
-                                            }
-                                            Column {
-                                                Text(
-                                                    user.username,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 18.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                                Text(
-                                                    user.email,
-                                                    color = onSurfaceVariant,
-                                                    fontSize = 14.sp
-                                                )
-                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.AccountCircle,
+                                                contentDescription = "Foto de Perfil",
+                                                modifier = Modifier.size(40.dp),
+                                                tint = primaryColor
+                                            )
                                         }
-                                        OutlinedButton(
-                                            onClick = { /* TODO: Editar perfil */ },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = primaryColor),
-                                            border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.5f))
-                                        ) {
-                                            Text("Editar Perfil", fontWeight = FontWeight.Bold)
+                                        Column {
+                                            Text(
+                                                user.username,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 18.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                user.email,
+                                                color = onSurfaceVariant,
+                                                fontSize = 14.sp
+                                            )
                                         }
                                     }
                                 }
@@ -202,8 +183,7 @@ fun TelaPrincipalConfiguracao(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        // ✅ Borda adicionada
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp),
@@ -215,16 +195,7 @@ fun TelaPrincipalConfiguracao(
                                 fontSize = 18.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            ConfiguracaoSwitchItem(
-                                icon = Icons.Default.Notifications,
-                                text = "Notificações",
-                                description = "Receber lembretes de estudo",
-                                checked = notificationsEnabled,
-                                onCheckedChange = { notificationsEnabled = it }
-                            )
-                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            // ✅ Switch de Tema agora funciona!
                             ConfiguracaoSwitchItem(
                                 icon = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.WbSunny,
                                 text = "Modo Escuro",
@@ -232,16 +203,8 @@ fun TelaPrincipalConfiguracao(
                                 checked = isDarkTheme,
                                 onCheckedChange = {
                                     scope.launch { themeManager.toggleTheme() }
-                                }
-                            )
-                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-                            ConfiguracaoSwitchItem(
-                                icon = Icons.Default.VolumeUp,
-                                text = "Som",
-                                description = "Efeitos sonoros",
-                                checked = soundEnabled,
-                                onCheckedChange = { soundEnabled = it }
+                                },
+                                accentColor = cyanColor
                             )
                         }
                     }
@@ -253,8 +216,7 @@ fun TelaPrincipalConfiguracao(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        // ✅ Borda adicionada
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp),
@@ -269,18 +231,12 @@ fun TelaPrincipalConfiguracao(
                             ConfiguracaoClickItem(
                                 icon = Icons.Default.HelpOutline,
                                 text = "Central de Ajuda",
-                                onClick = { /* TODO */ }
+                                onClick = { navController.navigate(CENTRAL_AJUDA_ROUTE) }
                             )
                             Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             ConfiguracaoClickItem(
                                 icon = Icons.Default.Description,
                                 text = "Termos de Uso",
-                                onClick = { /* TODO */ }
-                            )
-                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                            ConfiguracaoClickItem(
-                                icon = Icons.Default.Shield,
-                                text = "Política de Privacidade",
                                 onClick = { /* TODO */ }
                             )
                         }
@@ -330,9 +286,9 @@ fun ConfiguracaoSwitchItem(
     text: String,
     description: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
@@ -349,13 +305,13 @@ fun ConfiguracaoSwitchItem(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(primaryColor.copy(alpha = 0.2f)),
+                    .background(accentColor.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = primaryColor,
+                    tint = accentColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -377,7 +333,7 @@ fun ConfiguracaoSwitchItem(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = primaryColor,
+                checkedTrackColor = accentColor,
                 uncheckedThumbColor = MaterialTheme.colorScheme.outline,
                 uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
