@@ -33,6 +33,15 @@ interface QuizDao {
 
     @Query("UPDATE quizzes SET isSynced = 1 WHERE id = :quizId")
     suspend fun markQuizAsSynced(quizId: Int)
+
+    // ===== DEBUG =====
+
+    /**
+     * ✅ MÉTODO DE DEBUG: Lista todos os quizzes de um usuário
+     * Útil para verificar se os dados estão realmente no banco
+     */
+    @Query("SELECT * FROM quizzes WHERE userId = :userId")
+    suspend fun getQuizzesForDebug(userId: Int): List<QuizEntity>
 }
 
 @Dao
