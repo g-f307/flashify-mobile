@@ -156,9 +156,11 @@ class SyncManager @Inject constructor(
             }
 
             // 1. Sincronizar logs de estudo
+            Log.d(TAG, "📝 Iniciando sync de logs de estudo...")
             syncStudyLogs(userId)
 
             // 2. Sincronizar tentativas de quiz
+            Log.d(TAG, "🎯 Iniciando sync de tentativas de quiz...")
             syncQuizAttempts(userId)
 
             // 3. Atualizar timestamp
@@ -166,7 +168,7 @@ class SyncManager @Inject constructor(
                 lastSyncTimestamp = System.currentTimeMillis()
             )
 
-            Log.d(TAG, "✅ Sincronização completa bem-sucedida")
+            Log.d(TAG, "✅ Sincronização completa bem-sucedida!")
             return true
 
         } catch (e: Exception) {
@@ -179,17 +181,15 @@ class SyncManager @Inject constructor(
         }
     }
 
-    /**
-     * Sincroniza logs de estudo pendentes
-     */
     private suspend fun syncStudyLogs(userId: Int) {
         val token = tokenManager.getToken() ?: return
         val unsyncedLogs = studyLogDao.getUnsyncedLogs(userId)
 
-        Log.d(TAG, "📝 Sincronizando ${unsyncedLogs.size} logs de estudo")
+        Log.d(TAG, "📝 Encontrados ${unsyncedLogs.size} logs não sincronizados")
 
         unsyncedLogs.forEach { log ->
             try {
+                Log.d(TAG, "📤 Enviando log ${log.localId} para servidor...")
                 apiService.logStudy(
                     token,
                     log.flashcardId,
@@ -197,7 +197,7 @@ class SyncManager @Inject constructor(
                 )
 
                 studyLogDao.markLogAsSynced(log.localId)
-                Log.d(TAG, "✅ Log ${log.localId} sincronizado")
+                Log.d(TAG, "✅ Log ${log.localId} marcado como sincronizado")
 
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Erro ao sincronizar log ${log.localId}: ${e.message}")
@@ -205,17 +205,15 @@ class SyncManager @Inject constructor(
         }
     }
 
-    /**
-     * Sincroniza tentativas de quiz pendentes
-     */
     private suspend fun syncQuizAttempts(userId: Int) {
         val token = tokenManager.getToken() ?: return
         val unsyncedAttempts = quizAttemptDao.getUnsyncedAttempts(userId)
 
-        Log.d(TAG, "🎯 Sincronizando ${unsyncedAttempts.size} tentativas de quiz")
+        Log.d(TAG, "🎯 Encontradas ${unsyncedAttempts.size} tentativas não sincronizadas")
 
         unsyncedAttempts.forEach { attempt ->
             try {
+                Log.d(TAG, "📤 Enviando tentativa ${attempt.localId} para servidor...")
                 val request = SubmitQuizRequest(
                     score = attempt.score,
                     correctAnswers = attempt.correctAnswers,
@@ -225,7 +223,7 @@ class SyncManager @Inject constructor(
                 apiService.submitQuizAttempt(token, attempt.quizId, request)
 
                 quizAttemptDao.markAttemptAsSynced(attempt.localId)
-                Log.d(TAG, "✅ Tentativa ${attempt.localId} sincronizada")
+                Log.d(TAG, "✅ Tentativa ${attempt.localId} marcada como sincronizada")
 
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Erro ao sincronizar tentativa ${attempt.localId}: ${e.message}")

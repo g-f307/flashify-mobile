@@ -74,22 +74,27 @@ class QuizViewModel @Inject constructor(
                 return@launch
             }
 
-            // 1️⃣ Tentar carregar do cache local primeiro
+            Log.d("QuizViewModel", "🔄 Carregando quiz $documentId para usuário $userId")
+
+            // 1️⃣ Tentar carregar do cache local PRIMEIRO
             try {
                 val localQuiz = quizDao.getQuizByDocumentId(documentId, userId)
 
                 if (localQuiz != null) {
+                    Log.d("QuizViewModel", "📦 Quiz encontrado no CACHE")
                     val questions = questionDao.getQuestionsByQuizId(localQuiz.id, userId)
                     val quizResponse = localQuiz.toQuizResponse(questions, answerDao, userId)
 
                     _quizState.value = QuizState.Success(quizResponse)
-                    Log.d("QuizViewModel", "📦 Quiz carregado do cache")
+                    Log.d("QuizViewModel", "✅ Quiz carregado do cache com ${questions.size} perguntas")
 
                     // Se estiver online, atualizar em background
                     if (syncManager.isOnline()) {
                         loadQuizFromNetwork(documentId, userId, silent = true)
                     }
                     return@launch
+                } else {
+                    Log.d("QuizViewModel", "⚠️ Quiz não encontrado no cache")
                 }
             } catch (e: Exception) {
                 Log.e("QuizViewModel", "❌ Erro ao ler cache: ${e.message}")
@@ -100,7 +105,7 @@ class QuizViewModel @Inject constructor(
                 loadQuizFromNetwork(documentId, userId, silent = false)
             } else {
                 _quizState.value = QuizState.Error(
-                    "Este quiz não está disponível offline. Conecte-se à internet."
+                    "Este quiz não está disponível offline. Conecte-se à internet primeiro."
                 )
             }
         }

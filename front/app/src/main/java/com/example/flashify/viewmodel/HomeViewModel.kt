@@ -49,13 +49,19 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val tokenManager: TokenManager,
     private val apiService: ApiService,
-    private val syncManager: SyncManager // ✅ 1. Injeção do SyncManager
+    private val syncManager: SyncManager
 ) : ViewModel() {
+
+    // --- 1. VARIÁVEIS DE ESTADO E CONSTANTES (Declaradas PRIMEIRO) ---
+
+    private val SESSION_DURATION_SECONDS = 15 * 60
+
+    // Inicializamos esta variável primeiro para evitar NullPointerException no init
+    private val _timeStudiedToday = MutableStateFlow(0)
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState = _uiState.asStateFlow()
 
-    // ✅ 2. Expondo o estado de conectividade para a UI
     val connectivityState = syncManager.connectivityState
         .stateIn(
             scope = viewModelScope,
@@ -63,18 +69,27 @@ class HomeViewModel @Inject constructor(
             initialValue = ConnectivityState()
         )
 
-    private val SESSION_DURATION_SECONDS = 15 * 60
-
-    private val _timeStudiedToday = MutableStateFlow(0)
+    // --- 2. BLOCO DE INICIALIZAÇÃO (Executa DEPOIS das variáveis existirem) ---
 
     init {
         fetchProgressData()
         observeStudyTimer()
     }
 
-    // ✅ 3. Função para forçar sincronização (chamada pela UI)
+    // --- 3. FUNÇÕES PÚBLICAS E LÓGICA ---
+
+    // ✅ Método público para sincronizar (chamado pela UI)
     fun forceSyncNow() {
+        Log.d("HomeViewModel", "🔄 forceSyncNow chamado")
         syncManager.forceSyncNow()
+    }
+
+    fun addStudyTime(seconds: Int) {
+        _timeStudiedToday.value += seconds
+    }
+
+    fun refresh() {
+        fetchProgressData()
     }
 
     private fun fetchProgressData() {
@@ -142,7 +157,6 @@ class HomeViewModel @Inject constructor(
         Log.d("HomeViewModel", "Hoje: $today (${today.dayOfWeek})")
         Log.d("HomeViewModel", "Segunda da semana: $monday")
         Log.d("HomeViewModel", "Backend data: ${stats.flashcardWeeklyActivity}")
-        Log.d("HomeViewModel", "Cards studied: ${stats.cardsStudiedWeek}")
 
         val daysOfWeekLetters = listOf("S", "T", "Q", "Q", "S", "S", "D")
 
@@ -151,52 +165,40 @@ class HomeViewModel @Inject constructor(
             date.isEqual(today)
         }
 
-        Log.d("HomeViewModel", "Índice do dia atual: $todayIndex")
-
+        // Lógica para lidar com possíveis inconsistências do backend (buggy backend check)
         val backendIsBuggy = stats.cardsStudiedWeek > 0 &&
                 todayIndex >= 0 &&
                 (stats.flashcardWeeklyActivity.getOrNull(todayIndex) ?: 0) == 0
-
-        Log.d("HomeViewModel", "Backend bugado? $backendIsBuggy")
 
         val streakDays = (0..6).map { i ->
             val date = monday.plusDays(i.toLong())
             val activityCount = stats.flashcardWeeklyActivity.getOrNull(i) ?: 0
 
             val status = when {
-                date.isAfter(today) -> {
-                    Log.d("HomeViewModel", "[$i] $date - FUTURO -> PENDING")
-                    StreakStatus.PENDING
-                }
+                date.isAfter(today) -> StreakStatus.PENDING
 
                 date.isEqual(today) -> {
                     if (backendIsBuggy) {
-                        Log.d("HomeViewModel", "[$i] $date - HOJE (backend bugado, forçando STUDIED)")
                         StreakStatus.STUDIED
                     } else if (activityCount > 0) {
-                        Log.d("HomeViewModel", "[$i] $date - HOJE com activity=$activityCount -> STUDIED")
                         StreakStatus.STUDIED
                     } else {
-                        Log.d("HomeViewModel", "[$i] $date - HOJE sem atividade -> PENDING")
                         StreakStatus.PENDING
                     }
                 }
 
                 else -> {
+                    // Dias passados
                     if (backendIsBuggy && activityCount > 0) {
                         val totalDaysWithActivity = stats.flashcardWeeklyActivity.count { it > 0 }
                         if (totalDaysWithActivity == 1) {
-                            Log.d("HomeViewModel", "[$i] $date - PASSADO mas é o bug do backend -> MISSED")
                             StreakStatus.MISSED
                         } else {
-                            Log.d("HomeViewModel", "[$i] $date - PASSADO com activity=$activityCount -> STUDIED")
                             StreakStatus.STUDIED
                         }
                     } else if (activityCount > 0) {
-                        Log.d("HomeViewModel", "[$i] $date - PASSADO com activity=$activityCount -> STUDIED")
                         StreakStatus.STUDIED
                     } else {
-                        Log.d("HomeViewModel", "[$i] $date - PASSADO sem atividade -> MISSED")
                         StreakStatus.MISSED
                     }
                 }
@@ -209,14 +211,12 @@ class HomeViewModel @Inject constructor(
             )
         }
 
-        Log.d("HomeViewModel", "Resultado final: ${streakDays.mapIndexed { idx, day -> "$idx:${day.dayLetter}=${day.status}" }}")
-        Log.d("HomeViewModel", "=== FIM DO CÁLCULO ===")
-
         return streakDays
     }
 
     private fun observeStudyTimer() {
         viewModelScope.launch {
+            // Coleta o fluxo de tempo estudado
             _timeStudiedToday.collect { timeInSeconds ->
                 val progress = (timeInSeconds.toFloat() / SESSION_DURATION_SECONDS).coerceAtMost(1.0f)
                 _uiState.update {
@@ -224,13 +224,5 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    fun addStudyTime(seconds: Int) {
-        _timeStudiedToday.value += seconds
-    }
-
-    fun refresh() {
-        fetchProgressData()
     }
 }

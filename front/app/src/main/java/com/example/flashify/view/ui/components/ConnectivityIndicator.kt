@@ -1,5 +1,6 @@
 package com.example.flashify.view.ui.components
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -44,36 +45,30 @@ fun ConnectivityBanner(
     ) {
         Surface(
             color = when {
-                !connectivityState.isOnline -> Color(0xFFFF9800)  // Laranja - Offline
-                connectivityState.isSyncing -> Color(0xFF2196F3)   // Azul - Sincronizando
-                connectivityState.pendingSyncCount > 0 -> Color(0xFFFFC107)  // Amarelo - Pendente
-                else -> Color(0xFF4CAF50)  // Verde - Online e atualizado
+                !connectivityState.isOnline -> Color(0xFFFF9800)
+                connectivityState.isSyncing -> Color(0xFF2196F3)
+                connectivityState.pendingSyncCount > 0 -> Color(0xFFFFC107)
+                else -> Color(0xFF4CAF50)
             },
             modifier = Modifier
                 .fillMaxWidth()
-                // ✅ CRÍTICO: Respeita a barra de status do sistema
                 .statusBarsPadding()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clickable(enabled = connectivityState.pendingSyncCount > 0) {
-                        onSyncClick()
-                    },
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // ========== SEÇÃO: Ícone + Mensagem ==========
+                // SEÇÃO: Ícone + Mensagem
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    // Ícone animado/estático
                     when {
                         connectivityState.isSyncing -> {
-                            // Ícone de sincronização animado
                             val rotation by rememberInfiniteTransition(label = "rotation").animateFloat(
                                 initialValue = 0f,
                                 targetValue = 360f,
@@ -93,7 +88,6 @@ fun ConnectivityBanner(
                             )
                         }
                         !connectivityState.isOnline -> {
-                            // Ícone de offline
                             Icon(
                                 Icons.Default.CloudOff,
                                 contentDescription = "Offline",
@@ -102,7 +96,6 @@ fun ConnectivityBanner(
                             )
                         }
                         connectivityState.pendingSyncCount > 0 -> {
-                            // Ícone de nuvem com items pendentes
                             Icon(
                                 Icons.Default.CloudQueue,
                                 contentDescription = "Pendente",
@@ -110,20 +103,9 @@ fun ConnectivityBanner(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-                        else -> {
-                            // Ícone de sucesso (raramente mostrado, pois o banner fica invisível)
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = "Sincronizado",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     }
 
-                    // Coluna de texto
                     Column(modifier = Modifier.weight(1f)) {
-                        // Título principal
                         Text(
                             text = when {
                                 connectivityState.isSyncing -> "Sincronizando..."
@@ -136,7 +118,6 @@ fun ConnectivityBanner(
                             fontWeight = FontWeight.Bold
                         )
 
-                        // Subtítulo - Mostra número de itens pendentes
                         if (connectivityState.pendingSyncCount > 0 && !connectivityState.isSyncing) {
                             Text(
                                 text = "${connectivityState.pendingSyncCount} ${
@@ -147,7 +128,6 @@ fun ConnectivityBanner(
                             )
                         }
 
-                        // Subtítulo - Modo offline
                         if (!connectivityState.isOnline) {
                             Text(
                                 text = "Seus dados estão disponíveis offline",
@@ -155,33 +135,41 @@ fun ConnectivityBanner(
                                 fontSize = 11.sp
                             )
                         }
-
-                        // Subtítulo - Sincronizando
-                        if (connectivityState.isSyncing) {
-                            Text(
-                                text = "Aguarde...",
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 11.sp
-                            )
-                        }
                     }
                 }
 
-                // ========== SEÇÃO: Botão de Sincronização Manual ==========
-                if (connectivityState.isOnline &&
-                    connectivityState.pendingSyncCount > 0 &&
-                    !connectivityState.isSyncing) {
-                    Surface(
-                        color = Color.White.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.clickable { onSyncClick() }
+                // ✅ SEÇÃO: Botão de Sincronização (CORRIGIDO)
+                // Mostrar botão SEMPRE que houver pendentes e estiver online
+                if (connectivityState.pendingSyncCount > 0 &&
+                    !connectivityState.isSyncing &&
+                    connectivityState.isOnline) {
+
+                    Button(
+                        onClick = {
+                            Log.d("ConnectivityBanner", "🔄 Botão Sincronizar clicado")
+                            onSyncClick()
+                        },
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.25f),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(14.dp)
+                                .padding(end = 4.dp)
+                        )
                         Text(
                             text = "Sincronizar",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
