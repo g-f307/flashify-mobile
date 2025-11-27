@@ -6,7 +6,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Entidade Room para armazenar Quizzes localmente
+ * ✅ CORRIGIDO: Adicionado índice composto (documentId, userId)
  */
 @Entity(
     tableName = "quizzes",
@@ -21,7 +21,7 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["documentId"]),
         Index(value = ["userId"]),
-        Index(value = ["documentId", "userId"])
+        Index(value = ["documentId", "userId"]) // ✅ ADICIONADO
     ]
 )
 data class QuizEntity(
@@ -30,11 +30,11 @@ data class QuizEntity(
     val documentId: Int,
     val userId: Int,
     val createdAt: Long = System.currentTimeMillis(),
-    val isSynced: Boolean = true // Rastreia se foi sincronizado com o servidor
+    val isSynced: Boolean = true
 )
 
 /**
- * Entidade Room para armazenar Questões do Quiz
+ * ✅ CORRIGIDO: Adicionado índice composto (quizId, userId)
  */
 @Entity(
     tableName = "quiz_questions",
@@ -48,7 +48,8 @@ data class QuizEntity(
     ],
     indices = [
         Index(value = ["quizId"]),
-        Index(value = ["userId"])
+        Index(value = ["userId"]),
+        Index(value = ["quizId", "userId"]) // ✅ ADICIONADO
     ]
 )
 data class QuestionEntity(
@@ -56,12 +57,12 @@ data class QuestionEntity(
     val text: String,
     val quizId: Int,
     val userId: Int,
-    val orderIndex: Int = 0, // Para manter ordem das questões
+    val orderIndex: Int = 0,
     val isSynced: Boolean = true
 )
 
 /**
- * Entidade Room para armazenar Respostas das Questões
+ * ✅ CORRIGIDO: Adicionado índice composto (questionId, userId)
  */
 @Entity(
     tableName = "quiz_answers",
@@ -75,7 +76,8 @@ data class QuestionEntity(
     ],
     indices = [
         Index(value = ["questionId"]),
-        Index(value = ["userId"])
+        Index(value = ["userId"]),
+        Index(value = ["questionId", "userId"]) // ✅ ADICIONADO
     ]
 )
 data class AnswerEntity(
@@ -89,9 +91,6 @@ data class AnswerEntity(
     val isSynced: Boolean = true
 )
 
-/**
- * Entidade Room para rastrear tentativas de Quiz offline
- */
 @Entity(
     tableName = "quiz_attempts",
     foreignKeys = [
@@ -116,12 +115,9 @@ data class QuizAttemptEntity(
     val correctAnswers: Int,
     val totalQuestions: Int,
     val attemptDate: Long = System.currentTimeMillis(),
-    val isSynced: Boolean = false // Será sincronizado quando estiver online
+    val isSynced: Boolean = false
 )
 
-/**
- * Entidade Room para rastrear logs de estudo offline
- */
 @Entity(
     tableName = "study_logs",
     foreignKeys = [

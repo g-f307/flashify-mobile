@@ -14,7 +14,7 @@ import com.example.flashify.model.database.dataclass.*
  */
 @Database(
     entities = [
-        UserEntity::class,              // ✅ NOVO na v4
+        UserEntity::class,
         DeckEntity::class,
         FlashcardEntity::class,
         QuizEntity::class,
@@ -23,13 +23,11 @@ import com.example.flashify.model.database.dataclass.*
         QuizAttemptEntity::class,
         StudyLogEntity::class
     ],
-    version = 4,                        // ⬆️ ATUALIZADO
+    version = 5, // ✅ INCREMENTAR DE 4 PARA 5
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
-
-    // DAOs existentes
-    abstract fun userDao(): UserDao                     // ✅ NOVO
+    abstract fun userDao(): UserDao
     abstract fun deckDao(): DeckDao
     abstract fun flashcardDao(): FlashcardDao
     abstract fun quizDao(): QuizDao
@@ -49,7 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "flashify_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration() // ✅ Recria DB com novos índices
                     .build()
                 INSTANCE = instance
                 instance

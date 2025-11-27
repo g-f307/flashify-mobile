@@ -10,9 +10,16 @@ import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.DeckStatsResponse
 import com.example.flashify.model.data.DeckUpdateRequest
 import com.example.flashify.model.data.TextDeckCreateRequest
+import com.example.flashify.model.database.dao.AnswerDao
 import com.example.flashify.model.database.dao.DeckDao
 import com.example.flashify.model.database.dao.FlashcardDao
+import com.example.flashify.model.database.dao.QuestionDao
+import com.example.flashify.model.database.dao.QuizDao
+import com.example.flashify.model.database.dataclass.AnswerEntity
 import com.example.flashify.model.database.dataclass.DeckEntity
+import com.example.flashify.model.database.dataclass.FlashcardEntity
+import com.example.flashify.model.database.dataclass.QuestionEntity
+import com.example.flashify.model.database.dataclass.QuizEntity
 import com.example.flashify.model.manager.LocalUserManager
 import com.example.flashify.model.manager.SyncManager
 import com.example.flashify.model.manager.TokenManager
@@ -86,7 +93,11 @@ class DeckViewModel @Inject constructor(
     private val flashcardDao: FlashcardDao,
     private val contentResolver: ContentResolver,
     private val syncManager: SyncManager,
-    private val localUserManager: LocalUserManager// ✅ NOVO: Injeção do SyncManager
+    private val localUserManager: LocalUserManager,
+    // ✅ ADICIONAR ESTES DAOs:
+    private val quizDao: QuizDao,
+    private val questionDao: QuestionDao,
+    private val answerDao: AnswerDao
 ) : ViewModel() {
 
     private val _deckListState = MutableStateFlow<DeckListState>(DeckListState.Loading)
@@ -124,6 +135,9 @@ class DeckViewModel @Inject constructor(
     /**
      * ✅ CORRIGIDO: Busca decks com suporte offline completo
      */
+    /**
+     * ✅ CORRIGIDO: Agora salva flashcards e quizzes no cache
+     */
     fun fetchDecks(showLoading: Boolean = true) {
         viewModelScope.launch {
             if (showLoading) {
@@ -142,18 +156,13 @@ class DeckViewModel @Inject constructor(
                 return@launch
             }
 
-            // ✅ 1️⃣ Carregar do cache PRIMEIRO (sempre)
+            // ✅ 1️⃣ Carregar do cache PRIMEIRO
             try {
                 val localDecks = deckDao.getAllDecksForUser(userId).map { it.toDeckResponse() }
 
-                // 🔍 LOG DETALHADO
                 Log.d("DeckViewModel", "🔍 === CACHE DE DECKS ===")
                 Log.d("DeckViewModel", "🔍 User ID: $userId")
                 Log.d("DeckViewModel", "🔍 Total decks: ${localDecks.size}")
-
-                localDecks.take(3).forEachIndexed { index, deck ->
-                    Log.d("DeckViewModel", "🔍 Deck[$index]: id=${deck.id}, title=${deck.filePath}, userId?")
-                }
 
                 if (localDecks.isNotEmpty()) {
                     val recentDeck = localDecks
@@ -167,7 +176,7 @@ class DeckViewModel @Inject constructor(
                 Log.e("DeckViewModel", "❌ Erro ao ler cache: ${e.message}", e)
             }
 
-            // ✅ 2️⃣ Se estiver ONLINE, sincronizar (não bloqueia)
+            // ✅ 2️⃣ Se estiver ONLINE, sincronizar
             if (syncManager.isOnline()) {
                 try {
                     val networkDecksResponse = apiService.getDecks(token)
@@ -177,22 +186,100 @@ class DeckViewModel @Inject constructor(
 
                     _deckListState.value = DeckListState.Success(networkDecksResponse, recentDeck)
 
-                    // Atualizar cache
+                    // ✅ Atualizar cache de DECKS
                     val networkDeckEntities = networkDecksResponse.map { it.toDeckEntity(userId) }
                     deckDao.insertDecks(networkDeckEntities)
 
                     Log.d("DeckViewModel", "🔄 ${networkDecksResponse.size} decks sincronizados")
 
+                    // ✅ 3️⃣ SALVAR FLASHCARDS DE CADA DECK
+                    networkDecksResponse.forEach { deck ->
+                        try {
+                            val flashcardsResponse = apiService.getFlashcardsForDocument(token, deck.id)
+                            val flashcardEntities = flashcardsResponse.map { flashcard ->
+                                FlashcardEntity(
+                                    id = flashcard.id,
+                                    front = flashcard.front,
+                                    back = flashcard.back,
+                                    type = flashcard.type,
+                                    deckId = flashcard.documentId,
+                                    userId = userId
+                                )
+                            }
+
+                            // Limpar flashcards antigos e inserir novos
+                            flashcardDao.deleteFlashcardsForDeckForUser(deck.id, userId)
+                            flashcardDao.insertFlashcards(flashcardEntities)
+
+                            Log.d("DeckViewModel", "✅ ${flashcardEntities.size} flashcards salvos para deck ${deck.id}")
+                        } catch (e: Exception) {
+                            Log.e("DeckViewModel", "❌ Erro ao salvar flashcards do deck ${deck.id}: ${e.message}")
+                        }
+                    }
+
+                    // ✅ 4️⃣ SALVAR QUIZZES (se existirem)
+                    networkDecksResponse.filter { it.hasQuiz }.forEach { deck ->
+                        try {
+                            val documentDetail = apiService.getDocumentDetailWithQuiz(token, deck.id)
+
+                            if (documentDetail.quiz != null) {
+                                val quiz = documentDetail.quiz
+
+                                // Salvar quiz
+                                val quizEntity = QuizEntity(
+                                    id = quiz.id,
+                                    title = quiz.title,
+                                    documentId = quiz.documentId,
+                                    userId = userId,
+                                    isSynced = true
+                                )
+                                quizDao.insertQuiz(quizEntity)
+
+                                // Salvar perguntas
+                                val questionEntities = quiz.questions.mapIndexed { index, q ->
+                                    QuestionEntity(
+                                        id = q.id,
+                                        text = q.text,
+                                        quizId = q.quizId,
+                                        userId = userId,
+                                        orderIndex = index,
+                                        isSynced = true
+                                    )
+                                }
+                                questionDao.insertQuestions(questionEntities)
+
+                                // Salvar respostas
+                                quiz.questions.forEach { question ->
+                                    val answerEntities = question.answers.mapIndexed { index, a ->
+                                        AnswerEntity(
+                                            id = a.id,
+                                            text = a.text,
+                                            isCorrect = a.isCorrect,
+                                            explanation = a.explanation,
+                                            questionId = a.questionId,
+                                            userId = userId,
+                                            orderIndex = index,
+                                            isSynced = true
+                                        )
+                                    }
+                                    answerDao.insertAnswers(answerEntities)
+                                }
+
+                                Log.d("DeckViewModel", "✅ Quiz ${quiz.id} salvo para deck ${deck.id}")
+                            }
+                        } catch (e: Exception) {
+                            Log.e("DeckViewModel", "❌ Erro ao salvar quiz do deck ${deck.id}: ${e.message}")
+                        }
+                    }
+
                 } catch (e: Exception) {
                     Log.e("DeckViewModel", "⚠️ Erro na rede: ${e.message}")
-                    // ✅ Mantém os dados do cache se a rede falhar
                     if (_deckListState.value !is DeckListState.Success) {
                         _deckListState.value = DeckListState.Error("Falha ao conectar. Mostrando dados locais.")
                     }
                 }
             } else {
                 Log.d("DeckViewModel", "📵 Modo offline - usando cache")
-                // ✅ Se não há dados no cache E está offline, mostrar erro claro
                 if ((_deckListState.value as? DeckListState.Success)?.decks.isNullOrEmpty()) {
                     _deckListState.value = DeckListState.Error(
                         "Nenhum deck disponível offline. Conecte-se à internet primeiro."
