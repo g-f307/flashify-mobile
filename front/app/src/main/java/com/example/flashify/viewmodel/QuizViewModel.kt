@@ -65,156 +65,232 @@ class QuizViewModel @Inject constructor(
      * ✅ NOVO: Carregar quiz com suporte offline
      */
     // QuizViewModel.kt
+    // QuizViewModel.kt - Método loadQuiz() CORRIGIDO
+
+    // QuizViewModel.kt - SUBSTITUIR O MÉTODO loadQuiz() COMPLETO
+
     fun loadQuiz(documentId: Int) {
         viewModelScope.launch {
             _quizState.value = QuizState.Loading
             val userId = getCurrentUserId()
 
-            Log.d("QuizViewModel", "🔍 === INÍCIO BUSCA QUIZ ===")
-            Log.d("QuizViewModel", "🔍 Document ID: $documentId")
-            Log.d("QuizViewModel", "🔍 User ID: $userId")
-            Log.d("QuizViewModel", "🔍 Online: ${syncManager.isOnline()}")
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d("QuizViewModel", "🔍 INÍCIO BUSCA QUIZ")
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d("QuizViewModel", "📋 Document ID: $documentId")
+            Log.d("QuizViewModel", "👤 User ID: $userId")
+            Log.d("QuizViewModel", "🌐 Online: ${syncManager.isOnline()}")
 
             if (userId == TokenManager.INVALID_USER_ID) {
                 _quizState.value = QuizState.Error("Utilizador inválido")
                 return@launch
             }
 
-            // ✅ 1️⃣ SEMPRE tentar carregar do cache PRIMEIRO
+            // ✅ DIAGNÓSTICO COMPLETO DO BANCO
             try {
-                Log.d("QuizViewModel", "🔍 Tentando ler quiz do CACHE...")
-                Log.d("QuizViewModel", "🔍 Query: quizDao.getQuizByDocumentId($documentId, $userId)")
+                Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                Log.d("QuizViewModel", "🔧 DIAGNÓSTICO DO BANCO DE DADOS")
+                Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-                val localQuiz = quizDao.getQuizByDocumentId(documentId, userId)
+                // 1. Verificar TODOS os quizzes no banco
+                val allQuizzes = quizDao.getQuizzesForDebug(userId)
+                Log.d("QuizViewModel", "📊 Total de quizzes no banco: ${allQuizzes.size}")
 
-                Log.d("QuizViewModel", "🔍 Resultado: ${if (localQuiz != null) "ENCONTRADO" else "NÃO ENCONTRADO"}")
+                allQuizzes.forEachIndexed { index, quiz ->
+                    Log.d("QuizViewModel", "   Quiz #${index + 1}:")
+                    Log.d("QuizViewModel", "      ID: ${quiz.id}")
+                    Log.d("QuizViewModel", "      Title: ${quiz.title}")
+                    Log.d("QuizViewModel", "      DocumentId: ${quiz.documentId}")
+                    Log.d("QuizViewModel", "      UserId: ${quiz.userId}")
+                    Log.d("QuizViewModel", "      IsSynced: ${quiz.isSynced}")
 
-                if (localQuiz != null) {
-                    Log.d("QuizViewModel", "🔍 Quiz encontrado:")
-                    Log.d("QuizViewModel", "   - ID: ${localQuiz.id}")
-                    Log.d("QuizViewModel", "   - Title: ${localQuiz.title}")
-                    Log.d("QuizViewModel", "   - DocumentId: ${localQuiz.documentId}")
-                    Log.d("QuizViewModel", "   - UserId: ${localQuiz.userId}")
+                    // Verificar perguntas
+                    val questions = questionDao.getQuestionsByQuizId(quiz.id, userId)
+                    Log.d("QuizViewModel", "      Perguntas: ${questions.size}")
 
-                    // Buscar perguntas
-                    Log.d("QuizViewModel", "🔍 Buscando perguntas para quiz ${localQuiz.id}...")
-                    val questions = questionDao.getQuestionsByQuizId(localQuiz.id, userId)
-                    Log.d("QuizViewModel", "🔍 Perguntas encontradas: ${questions.size}")
-
-                    // Detalhar cada pergunta
-                    questions.take(2).forEachIndexed { index, question ->
-                        Log.d("QuizViewModel", "🔍 Pergunta[$index]:")
-                        Log.d("QuizViewModel", "   - ID: ${question.id}")
-                        Log.d("QuizViewModel", "   - Text: ${question.text.take(50)}...")
-                        Log.d("QuizViewModel", "   - QuizId: ${question.quizId}")
-                        Log.d("QuizViewModel", "   - UserId: ${question.userId}")
-
-                        // Buscar respostas
+                    questions.take(2).forEachIndexed { qIndex, question ->
                         val answers = answerDao.getAnswersByQuestionId(question.id, userId)
-                        Log.d("QuizViewModel", "   - Respostas: ${answers.size}")
-
-                        answers.take(2).forEachIndexed { ansIdx, answer ->
-                            Log.d("QuizViewModel", "     [$ansIdx] ${answer.text.take(30)}... (correct: ${answer.isCorrect})")
-                        }
+                        Log.d("QuizViewModel", "         Q${qIndex + 1}: ${question.text.take(40)}... (${answers.size} respostas)")
                     }
 
-                    // ✅ VERIFICAÇÃO CRÍTICA: Tem perguntas?
-                    if (questions.isEmpty()) {
-                        Log.e("QuizViewModel", "❌ ERRO: Quiz encontrado mas SEM PERGUNTAS!")
-                        Log.e("QuizViewModel", "   Isso indica que as perguntas não foram salvas corretamente")
+                    Log.d("QuizViewModel", "   ---")
+                }
 
-                        // Tentar buscar da rede se estiver online
+                // 2. Procurar o quiz específico
+                Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                Log.d("QuizViewModel", "🔍 BUSCANDO QUIZ PARA DOCUMENTO $documentId")
+                Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                val targetQuiz = allQuizzes.find { it.documentId == documentId }
+
+                if (targetQuiz != null) {
+                    Log.d("QuizViewModel", "✅ Quiz encontrado no diagnóstico!")
+                    Log.d("QuizViewModel", "   ID do Quiz: ${targetQuiz.id}")
+                    Log.d("QuizViewModel", "   Agora tentando query normal...")
+
+                    // Tentar query normal
+                    val normalQuery = quizDao.getQuizByDocumentId(documentId, userId)
+
+                    if (normalQuery != null) {
+                        Log.d("QuizViewModel", "✅ Query normal funcionou!")
+                    } else {
+                        Log.e("QuizViewModel", "❌ ERRO CRÍTICO: Query normal falhou!")
+                        Log.e("QuizViewModel", "   Quiz existe mas getQuizByDocumentId() retornou NULL")
+                        Log.e("QuizViewModel", "   Tentando query direta pelo ID do quiz...")
+
+                        // Usar query direta
+                        val directQuery = quizDao.getQuizById(targetQuiz.id, userId)
+
+                        if (directQuery != null) {
+                            Log.d("QuizViewModel", "✅ Query direta funcionou!")
+
+                            // Processar quiz encontrado
+                            val questions = questionDao.getQuestionsByQuizId(directQuery.id, userId)
+
+                            if (questions.isNotEmpty()) {
+                                val quizResponse = directQuery.toQuizResponse(questions, answerDao, userId)
+                                _quizState.value = QuizState.Success(quizResponse)
+                                Log.d("QuizViewModel", "✅ Quiz carregado via query direta com ${questions.size} perguntas")
+                                return@launch
+                            } else {
+                                Log.e("QuizViewModel", "❌ Quiz sem perguntas!")
+                            }
+                        } else {
+                            Log.e("QuizViewModel", "❌ Query direta também falhou!")
+                        }
+                    }
+                } else {
+                    Log.e("QuizViewModel", "❌ Quiz não existe no banco para documentId=$documentId")
+                    Log.e("QuizViewModel", "   Quizzes disponíveis:")
+                    allQuizzes.forEach { q ->
+                        Log.e("QuizViewModel", "      - Doc ${q.documentId}: Quiz ${q.id}")
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e("QuizViewModel", "❌ ERRO NO DIAGNÓSTICO: ${e.message}", e)
+            }
+
+            // ✅ TENTATIVA 1: Query normal
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d("QuizViewModel", "📥 TENTATIVA 1: Query Normal")
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+            try {
+                val localQuiz = quizDao.getQuizByDocumentId(documentId, userId)
+
+                if (localQuiz != null) {
+                    Log.d("QuizViewModel", "✅ Quiz encontrado!")
+
+                    val questions = questionDao.getQuestionsByQuizId(localQuiz.id, userId)
+                    Log.d("QuizViewModel", "📝 Perguntas: ${questions.size}")
+
+                    if (questions.isEmpty()) {
+                        Log.e("QuizViewModel", "❌ Quiz sem perguntas - forçando reload da rede")
+
                         if (syncManager.isOnline()) {
-                            Log.d("QuizViewModel", "🌐 Tentando buscar perguntas da rede...")
                             loadQuizFromNetwork(documentId, userId, silent = false)
                             return@launch
                         } else {
-                            _quizState.value = QuizState.Error("Quiz corrompido. Conecte-se à internet para recarregar.")
+                            _quizState.value = QuizState.Error(
+                                "Quiz incompleto. Conecte-se à internet para recarregar."
+                            )
                             return@launch
                         }
                     }
 
-                    // Converter para QuizResponse
-                    val quizResponse = localQuiz.toQuizResponse(questions, answerDao, userId)
-
-                    // ✅ MOSTRAR CACHE IMEDIATAMENTE
-                    _quizState.value = QuizState.Success(quizResponse)
-                    Log.d("QuizViewModel", "✅ Quiz carregado do cache com ${questions.size} perguntas")
-
-                    // ✅ Se estiver ONLINE, atualizar em background
-                    if (syncManager.isOnline()) {
-                        Log.d("QuizViewModel", "🔄 Online - atualizando cache em background")
-                        loadQuizFromNetwork(documentId, userId, silent = true)
-                    } else {
-                        Log.d("QuizViewModel", "📵 Offline - usando apenas cache")
+                    // Verificar respostas
+                    var missingAnswers = false
+                    questions.forEach { question ->
+                        val answers = answerDao.getAnswersByQuestionId(question.id, userId)
+                        if (answers.isEmpty()) {
+                            Log.e("QuizViewModel", "❌ Pergunta ${question.id} sem respostas!")
+                            missingAnswers = true
+                        }
                     }
+
+                    if (missingAnswers) {
+                        Log.e("QuizViewModel", "❌ Quiz com respostas faltando - recarregando")
+
+                        if (syncManager.isOnline()) {
+                            loadQuizFromNetwork(documentId, userId, silent = false)
+                            return@launch
+                        }
+                    }
+
+                    // Converter e retornar
+                    val quizResponse = localQuiz.toQuizResponse(questions, answerDao, userId)
+                    _quizState.value = QuizState.Success(quizResponse)
+                    Log.d("QuizViewModel", "✅ Quiz carregado com sucesso!")
+
+                    // Atualizar em background se online
+                    if (syncManager.isOnline()) {
+                        Log.d("QuizViewModel", "🔄 Atualizando em background...")
+                        loadQuizFromNetwork(documentId, userId, silent = true)
+                    }
+
                     return@launch
                 } else {
-                    Log.w("QuizViewModel", "⚠️ Quiz não encontrado no cache")
-                    Log.w("QuizViewModel", "   Verificando se quiz existe no banco...")
-
-                    // DEBUG: Verificar quantos quizzes existem para este usuário
-                    try {
-                        // Query manual para debug
-                        val allQuizzesForUser = quizDao.getQuizzesForDebug(userId)
-                        Log.d("QuizViewModel", "🔍 Total de quizzes no banco para userId=$userId: ${allQuizzesForUser.size}")
-
-                        allQuizzesForUser.forEach { quiz ->
-                            Log.d("QuizViewModel", "   - Quiz ${quiz.id}: doc=${quiz.documentId}, title=${quiz.title}")
-                        }
-
-                        if (allQuizzesForUser.any { it.documentId == documentId }) {
-                            Log.e("QuizViewModel", "❌ ERRO CRÍTICO: Quiz existe mas query não encontrou!")
-                            Log.e("QuizViewModel", "   Isso indica problema no índice (documentId, userId)")
-                        }
-                    } catch (e: Exception) {
-                        Log.e("QuizViewModel", "❌ Erro ao fazer debug query: ${e.message}")
-                    }
+                    Log.w("QuizViewModel", "⚠️ Query normal retornou NULL")
                 }
             } catch (e: Exception) {
-                Log.e("QuizViewModel", "❌ Erro ao ler cache: ${e.message}", e)
+                Log.e("QuizViewModel", "❌ Erro na query normal: ${e.message}", e)
             }
 
-            // ✅ 2️⃣ Cache vazio - VERIFICAR se está offline
+            // ✅ TENTATIVA 2: Buscar da rede
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d("QuizViewModel", "🌐 TENTATIVA 2: Buscar da Rede")
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
             if (!syncManager.isOnline()) {
-                Log.w("QuizViewModel", "📵 Offline e SEM CACHE")
+                Log.e("QuizViewModel", "❌ Offline e quiz não encontrado no cache")
                 _quizState.value = QuizState.Error(
-                    "Este quiz não está disponível offline. Conecte-se à internet para baixá-lo."
+                    "Este quiz não está disponível offline. Conecte-se à internet."
                 )
                 return@launch
             }
 
-            // ✅ 3️⃣ Online e cache vazio - buscar da rede
-            Log.d("QuizViewModel", "🌐 Online e cache vazio - buscando da rede")
+            Log.d("QuizViewModel", "📡 Buscando da rede...")
             loadQuizFromNetwork(documentId, userId, silent = false)
         }
     }
 
-    /**
-     * ✅ NOVO: Buscar quiz da rede e salvar no cache
-     */
+    // ✅ Método para buscar da rede
     private suspend fun loadQuizFromNetwork(documentId: Int, userId: Int, silent: Boolean) {
         val token = tokenManager.getToken()
         if (token == null) {
             if (!silent) {
-                _quizState.value = QuizState.Error("Token de autenticação não encontrado")
+                _quizState.value = QuizState.Error("Token não encontrado")
             }
             return
         }
 
         try {
-            Log.d("QuizViewModel", "🌐 Buscando quiz da rede para documentId=$documentId")
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d("QuizViewModel", "🌐 BUSCANDO QUIZ DA REDE")
+            Log.d("QuizViewModel", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
             val documentDetail = apiService.getDocumentDetailWithQuiz(token, documentId)
 
             if (documentDetail.quiz != null) {
                 val quiz = documentDetail.quiz
 
-                Log.d("QuizViewModel", "🌐 Quiz recebido da API:")
-                Log.d("QuizViewModel", "   - ID: ${quiz.id}")
-                Log.d("QuizViewModel", "   - Title: ${quiz.title}")
-                Log.d("QuizViewModel", "   - Questions: ${quiz.questions.size}")
+                Log.d("QuizViewModel", "✅ Quiz recebido da API:")
+                Log.d("QuizViewModel", "   ID: ${quiz.id}")
+                Log.d("QuizViewModel", "   Title: ${quiz.title}")
+                Log.d("QuizViewModel", "   Questions: ${quiz.questions.size}")
 
-                // Salvar no cache
+                // LIMPAR DADOS ANTIGOS PRIMEIRO
+                Log.d("QuizViewModel", "🧹 Limpando dados antigos...")
+                try {
+                    // Deletar quiz antigo se existir
+                    quizDao.deleteQuizByDocumentId(documentId, userId)
+                    Log.d("QuizViewModel", "✅ Dados antigos removidos")
+                } catch (e: Exception) {
+                    Log.w("QuizViewModel", "⚠️ Erro ao limpar: ${e.message}")
+                }
+
+                // Salvar novo quiz
                 val quizEntity = QuizEntity(
                     id = quiz.id,
                     title = quiz.title,
@@ -223,7 +299,7 @@ class QuizViewModel @Inject constructor(
                     isSynced = true
                 )
 
-                Log.d("QuizViewModel", "💾 Salvando quiz no cache...")
+                Log.d("QuizViewModel", "💾 Salvando quiz...")
                 quizDao.insertQuiz(quizEntity)
 
                 // Salvar perguntas
@@ -261,7 +337,7 @@ class QuizViewModel @Inject constructor(
                 }
 
                 Log.d("QuizViewModel", "💾 Salvando $totalAnswers respostas...")
-                Log.d("QuizViewModel", "✅ Quiz sincronizado e salvo no cache")
+                Log.d("QuizViewModel", "✅ Quiz sincronizado completamente!")
 
                 _quizState.value = QuizState.Success(quiz)
             } else {
@@ -271,11 +347,44 @@ class QuizViewModel @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Log.e("QuizViewModel", "❌ Erro ao carregar quiz da rede: ${e.message}", e)
+            Log.e("QuizViewModel", "❌ Erro ao carregar da rede: ${e.message}", e)
             if (!silent) {
                 _quizState.value = QuizState.Error(e.message ?: "Erro ao carregar quiz")
             }
         }
+    }
+
+    // ✅ Método auxiliar para converter
+    private suspend fun QuizEntity.toQuizResponse(
+        questions: List<QuestionEntity>,
+        answerDao: AnswerDao,
+        userId: Int
+    ): QuizResponse {
+        val questionResponses = questions.map { question ->
+            val answers = answerDao.getAnswersByQuestionId(question.id, userId)
+
+            com.example.flashify.model.data.QuestionResponse(
+                id = question.id,
+                text = question.text,
+                quizId = question.quizId,
+                answers = answers.map { answer ->
+                    com.example.flashify.model.data.AnswerResponse(
+                        id = answer.id,
+                        text = answer.text,
+                        isCorrect = answer.isCorrect,
+                        explanation = answer.explanation,
+                        questionId = answer.questionId
+                    )
+                }
+            )
+        }
+
+        return QuizResponse(
+            id = this.id,
+            title = this.title,
+            documentId = this.documentId,
+            questions = questionResponses
+        )
     }
 
     fun checkAnswer(questionId: Int, answerId: Int) {
@@ -424,40 +533,5 @@ class QuizViewModel @Inject constructor(
                 Log.e("QuizViewModel", "❌ Erro ao atualizar stats: ${e.message}")
             }
         }
-    }
-
-    /**
-     * ✅ NOVO: Converter entidades locais para resposta da API
-     */
-    private suspend fun QuizEntity.toQuizResponse(
-        questions: List<QuestionEntity>,
-        answerDao: AnswerDao,
-        userId: Int
-    ): QuizResponse {
-        val questionResponses = questions.map { question ->
-            val answers = answerDao.getAnswersByQuestionId(question.id, userId)
-
-            com.example.flashify.model.data.QuestionResponse(
-                id = question.id,
-                text = question.text,
-                quizId = question.quizId,
-                answers = answers.map { answer ->
-                    com.example.flashify.model.data.AnswerResponse(
-                        id = answer.id,
-                        text = answer.text,
-                        isCorrect = answer.isCorrect,
-                        explanation = answer.explanation,
-                        questionId = answer.questionId
-                    )
-                }
-            )
-        }
-
-        return QuizResponse(
-            id = this.id,
-            title = this.title,
-            documentId = this.documentId,
-            questions = questionResponses
-        )
     }
 }

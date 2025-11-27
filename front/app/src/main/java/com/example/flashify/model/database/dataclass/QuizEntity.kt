@@ -21,7 +21,7 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["documentId"]),
         Index(value = ["userId"]),
-        Index(value = ["documentId", "userId"]) // ✅ ADICIONADO
+        Index(value = ["documentId", "userId"], unique = false) // ✅ NÃO DEVE SER UNIQUE
     ]
 )
 data class QuizEntity(

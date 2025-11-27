@@ -138,6 +138,9 @@ class DeckViewModel @Inject constructor(
     /**
      * ✅ CORRIGIDO: Agora salva flashcards e quizzes no cache
      */
+    // Em DeckViewModel.kt
+// Substitua o método fetchDecks() existente por esta versão corrigida:
+
     fun fetchDecks(showLoading: Boolean = true) {
         viewModelScope.launch {
             if (showLoading) {
@@ -177,113 +180,131 @@ class DeckViewModel @Inject constructor(
             }
 
             // ✅ 2️⃣ Se estiver ONLINE, sincronizar
-            if (syncManager.isOnline()) {
-                try {
-                    val networkDecksResponse = apiService.getDecks(token)
-                    val recentDeck = networkDecksResponse
-                        .filter { it.studiedFlashcards > 0 }
-                        .maxByOrNull { it.createdAt }
-
-                    _deckListState.value = DeckListState.Success(networkDecksResponse, recentDeck)
-
-                    // ✅ Atualizar cache de DECKS
-                    val networkDeckEntities = networkDecksResponse.map { it.toDeckEntity(userId) }
-                    deckDao.insertDecks(networkDeckEntities)
-
-                    Log.d("DeckViewModel", "🔄 ${networkDecksResponse.size} decks sincronizados")
-
-                    // ✅ 3️⃣ SALVAR FLASHCARDS DE CADA DECK
-                    networkDecksResponse.forEach { deck ->
-                        try {
-                            val flashcardsResponse = apiService.getFlashcardsForDocument(token, deck.id)
-                            val flashcardEntities = flashcardsResponse.map { flashcard ->
-                                FlashcardEntity(
-                                    id = flashcard.id,
-                                    front = flashcard.front,
-                                    back = flashcard.back,
-                                    type = flashcard.type,
-                                    deckId = flashcard.documentId,
-                                    userId = userId
-                                )
-                            }
-
-                            // Limpar flashcards antigos e inserir novos
-                            flashcardDao.deleteFlashcardsForDeckForUser(deck.id, userId)
-                            flashcardDao.insertFlashcards(flashcardEntities)
-
-                            Log.d("DeckViewModel", "✅ ${flashcardEntities.size} flashcards salvos para deck ${deck.id}")
-                        } catch (e: Exception) {
-                            Log.e("DeckViewModel", "❌ Erro ao salvar flashcards do deck ${deck.id}: ${e.message}")
-                        }
-                    }
-
-                    // ✅ 4️⃣ SALVAR QUIZZES (se existirem)
-                    networkDecksResponse.filter { it.hasQuiz }.forEach { deck ->
-                        try {
-                            val documentDetail = apiService.getDocumentDetailWithQuiz(token, deck.id)
-
-                            if (documentDetail.quiz != null) {
-                                val quiz = documentDetail.quiz
-
-                                // Salvar quiz
-                                val quizEntity = QuizEntity(
-                                    id = quiz.id,
-                                    title = quiz.title,
-                                    documentId = quiz.documentId,
-                                    userId = userId,
-                                    isSynced = true
-                                )
-                                quizDao.insertQuiz(quizEntity)
-
-                                // Salvar perguntas
-                                val questionEntities = quiz.questions.mapIndexed { index, q ->
-                                    QuestionEntity(
-                                        id = q.id,
-                                        text = q.text,
-                                        quizId = q.quizId,
-                                        userId = userId,
-                                        orderIndex = index,
-                                        isSynced = true
-                                    )
-                                }
-                                questionDao.insertQuestions(questionEntities)
-
-                                // Salvar respostas
-                                quiz.questions.forEach { question ->
-                                    val answerEntities = question.answers.mapIndexed { index, a ->
-                                        AnswerEntity(
-                                            id = a.id,
-                                            text = a.text,
-                                            isCorrect = a.isCorrect,
-                                            explanation = a.explanation,
-                                            questionId = a.questionId,
-                                            userId = userId,
-                                            orderIndex = index,
-                                            isSynced = true
-                                        )
-                                    }
-                                    answerDao.insertAnswers(answerEntities)
-                                }
-
-                                Log.d("DeckViewModel", "✅ Quiz ${quiz.id} salvo para deck ${deck.id}")
-                            }
-                        } catch (e: Exception) {
-                            Log.e("DeckViewModel", "❌ Erro ao salvar quiz do deck ${deck.id}: ${e.message}")
-                        }
-                    }
-
-                } catch (e: Exception) {
-                    Log.e("DeckViewModel", "⚠️ Erro na rede: ${e.message}")
-                    if (_deckListState.value !is DeckListState.Success) {
-                        _deckListState.value = DeckListState.Error("Falha ao conectar. Mostrando dados locais.")
-                    }
-                }
-            } else {
+            if (!syncManager.isOnline()) {
                 Log.d("DeckViewModel", "📵 Modo offline - usando cache")
                 if ((_deckListState.value as? DeckListState.Success)?.decks.isNullOrEmpty()) {
                     _deckListState.value = DeckListState.Error(
                         "Nenhum deck disponível offline. Conecte-se à internet primeiro."
                     )
+                }
+                return@launch
+            }
+
+            // ✅ 3️⃣ Sincronizar com verificação contínua de conectividade
+            try {
+                val networkDecksResponse = apiService.getDecks(token)
+                val recentDeck = networkDecksResponse
+                    .filter { it.studiedFlashcards > 0 }
+                    .maxByOrNull { it.createdAt }
+
+                _deckListState.value = DeckListState.Success(networkDecksResponse, recentDeck)
+
+                // Atualizar cache de DECKS
+                val networkDeckEntities = networkDecksResponse.map { it.toDeckEntity(userId) }
+                deckDao.insertDecks(networkDeckEntities)
+                Log.d("DeckViewModel", "🔄 ${networkDecksResponse.size} decks sincronizados")
+
+                // ✅ 4️⃣ SALVAR FLASHCARDS com verificação de conectividade
+                networkDecksResponse.forEach { deck ->
+                    // ✅ VERIFICAR CONECTIVIDADE ANTES DE CADA CHAMADA
+                    if (!syncManager.isOnline()) {
+                        Log.w("DeckViewModel", "⚠️ Rede perdida durante sincronização - abortando")
+                        return@launch
+                    }
+
+                    try {
+                        val flashcardsResponse = apiService.getFlashcardsForDocument(token, deck.id)
+                        val flashcardEntities = flashcardsResponse.map { flashcard ->
+                            FlashcardEntity(
+                                id = flashcard.id,
+                                front = flashcard.front,
+                                back = flashcard.back,
+                                type = flashcard.type,
+                                deckId = flashcard.documentId,
+                                userId = userId
+                            )
+                        }
+
+                        flashcardDao.deleteFlashcardsForDeckForUser(deck.id, userId)
+                        flashcardDao.insertFlashcards(flashcardEntities)
+                        Log.d("DeckViewModel", "✅ ${flashcardEntities.size} flashcards salvos para deck ${deck.id}")
+                    } catch (e: Exception) {
+                        // ✅ Não falhar toda a sincronização por erro em um deck
+                        Log.e("DeckViewModel", "❌ Erro ao salvar flashcards do deck ${deck.id}: ${e.message}")
+                        // Continua para o próximo deck
+                    }
+                }
+
+                // ✅ 5️⃣ SALVAR QUIZZES com verificação de conectividade
+                networkDecksResponse.filter { it.hasQuiz }.forEach { deck ->
+                    // ✅ VERIFICAR CONECTIVIDADE ANTES DE CADA CHAMADA
+                    if (!syncManager.isOnline()) {
+                        Log.w("DeckViewModel", "⚠️ Rede perdida durante sincronização de quizzes - abortando")
+                        return@launch
+                    }
+
+                    try {
+                        val documentDetail = apiService.getDocumentDetailWithQuiz(token, deck.id)
+
+                        if (documentDetail.quiz != null) {
+                            val quiz = documentDetail.quiz
+
+                            // Salvar quiz
+                            val quizEntity = QuizEntity(
+                                id = quiz.id,
+                                title = quiz.title,
+                                documentId = quiz.documentId,
+                                userId = userId,
+                                isSynced = true
+                            )
+                            quizDao.insertQuiz(quizEntity)
+
+                            // Salvar perguntas
+                            val questionEntities = quiz.questions.mapIndexed { index, q ->
+                                QuestionEntity(
+                                    id = q.id,
+                                    text = q.text,
+                                    quizId = q.quizId,
+                                    userId = userId,
+                                    orderIndex = index,
+                                    isSynced = true
+                                )
+                            }
+                            questionDao.insertQuestions(questionEntities)
+
+                            // Salvar respostas
+                            quiz.questions.forEach { question ->
+                                val answerEntities = question.answers.mapIndexed { index, a ->
+                                    AnswerEntity(
+                                        id = a.id,
+                                        text = a.text,
+                                        isCorrect = a.isCorrect,
+                                        explanation = a.explanation,
+                                        questionId = a.questionId,
+                                        userId = userId,
+                                        orderIndex = index,
+                                        isSynced = true
+                                    )
+                                }
+                                answerDao.insertAnswers(answerEntities)
+                            }
+
+                            Log.d("DeckViewModel", "✅ Quiz ${quiz.id} salvo para deck ${deck.id}")
+                        }
+                    } catch (e: Exception) {
+                        // ✅ Não falhar toda a sincronização por erro em um quiz
+                        Log.e("DeckViewModel", "❌ Erro ao salvar quiz do deck ${deck.id}: ${e.message}")
+                        // Continua para o próximo deck
+                    }
+                }
+
+                Log.d("DeckViewModel", "✅ Sincronização completa")
+
+            } catch (e: Exception) {
+                Log.e("DeckViewModel", "⚠️ Erro na rede: ${e.message}")
+                // ✅ Não sobrescrever estado de sucesso se já temos dados do cache
+                if (_deckListState.value !is DeckListState.Success) {
+                    _deckListState.value = DeckListState.Error("Falha ao conectar. Mostrando dados locais.")
                 }
             }
         }
@@ -296,50 +317,51 @@ class DeckViewModel @Inject constructor(
                 _deckStatsState.value = DeckStatsState.Loading
             }
 
-            // ✅ Se estiver OFFLINE, não tentar buscar stats
-            if (!syncManager.isOnline()) {
-                Log.d("DeckViewModel", "📵 Offline - não é possível buscar stats")
-                // ✅ Criar stats vazias para não bloquear a UI
-                _deckStatsState.value = DeckStatsState.Success(
-                    DeckStatsResponse(
-                        flashcards = com.example.flashify.model.data.FlashcardStatsResponse(
-                            known = 0,
-                            learning = 0,
-                            total = 0,
-                            progressPercentage = 0f
-                        ),
-                        quiz = null
-                    )
-                )
-                return@launch
+            // 1. Se estiver ONLINE, busca da API (comportamento normal)
+            if (syncManager.isOnline()) {
+                try {
+                    val token = tokenManager.getToken() ?: return@launch
+                    val stats = apiService.getDocumentStats(token, documentId)
+                    _deckStatsState.value = DeckStatsState.Success(stats)
+                    Log.d("DeckViewModel", "📊 Stats atualizadas da REDE para deck $documentId")
+                    return@launch
+                } catch (e: Exception) {
+                    Log.e("DeckViewModel", "⚠️ Erro na rede, tentando local: ${e.message}")
+                }
             }
 
-            try {
-                val token = tokenManager.getToken()
-                if (token == null) {
-                    _deckStatsState.value = DeckStatsState.Error("Sessão expirada")
-                    return@launch
-                }
+            // 2. Se estiver OFFLINE (ou rede falhou), calcula stats locais
+            Log.d("DeckViewModel", "📵 Offline/Fallback - Calculando stats locais")
+            val userId = getCurrentUserId()
 
-                val stats = apiService.getDocumentStats(token, documentId)
-                _deckStatsState.value = DeckStatsState.Success(stats)
+            // Buscar deck local para totais
+            val localDeck = deckDao.getDeckByIdForUser(documentId, userId)
 
-                Log.d("DeckViewModel", "📊 Stats atualizadas para deck $documentId")
+            if (localDeck != null) {
+                // Calcular progresso Flashcards
+                val progress = if (localDeck.totalFlashcards > 0)
+                    (localDeck.studiedFlashcards.toFloat() / localDeck.totalFlashcards) * 100f
+                else 0f
 
-            } catch (e: Exception) {
-                Log.e("DeckViewModel", "❌ Erro ao buscar stats: ${e.message}")
-                // ✅ Em caso de erro, não bloquear - usar stats vazias
+                // Buscar tentativas de Quiz locais (Isso requer uma query no DAO, vou simular ou você pode adicionar)
+                // Se você tiver acesso ao QuizDao aqui, pode fazer:
+                // val quiz = quizDao.getQuizByDocumentId(documentId, userId)
+                // val attempts = if (quiz != null) quizAttemptDao.getAttemptsByQuizId(quiz.id, userId) else emptyList()
+
+                // Por enquanto, retornamos o básico do deck para desbloquear a UI
                 _deckStatsState.value = DeckStatsState.Success(
                     DeckStatsResponse(
                         flashcards = com.example.flashify.model.data.FlashcardStatsResponse(
-                            known = 0,
-                            learning = 0,
-                            total = 0,
-                            progressPercentage = 0f
+                            known = localDeck.studiedFlashcards,
+                            learning = localDeck.totalFlashcards - localDeck.studiedFlashcards,
+                            total = localDeck.totalFlashcards,
+                            progressPercentage = progress
                         ),
-                        quiz = null
+                        quiz = null // O Quiz será ativado pelo 'hasQuiz' do Deck, não por stats nulas
                     )
                 )
+            } else {
+                _deckStatsState.value = DeckStatsState.Error("Deck não encontrado localmente")
             }
         }
     }
@@ -783,11 +805,31 @@ class DeckViewModel @Inject constructor(
     }
 
     private fun DeckEntity.toDeckResponse(): DeckResponse {
-        return DeckResponse(id, filePath, status, createdAt, totalFlashcards, studiedFlashcards, null)
+        return DeckResponse(
+            id = id,
+            filePath = filePath,
+            status = status,
+            createdAt = createdAt,
+            totalFlashcards = totalFlashcards,
+            studiedFlashcards = studiedFlashcards,
+            currentStep = null,
+            hasQuiz = hasQuiz, // ✅ LÊ DO BANCO
+            folderId = null
+        )
     }
 
+    // ✅ CORRIGIDO: Mapeamento agora salva hasQuiz
     private fun DeckResponse.toDeckEntity(userId: Int): DeckEntity {
-        return DeckEntity(id, filePath, status, createdAt, totalFlashcards, studiedFlashcards, userId)
+        return DeckEntity(
+            id = id,
+            filePath = filePath,
+            status = status,
+            createdAt = createdAt,
+            totalFlashcards = totalFlashcards,
+            studiedFlashcards = studiedFlashcards,
+            userId = userId,
+            hasQuiz = hasQuiz // ✅ SALVA NO BANCO
+        )
     }
 
     fun startDocumentPolling(documentId: Int) {
@@ -875,6 +917,30 @@ class DeckViewModel @Inject constructor(
             "Limite diário de gerações atingido! Tente novamente mais tarde."
         } else {
             "${defaultMessage}: ${e.message ?: "Erro desconhecido"}"
+        }
+    }
+
+    fun forceResyncQuizzes() {
+        viewModelScope.launch {
+            val userId = getCurrentUserId()
+            if (userId == TokenManager.INVALID_USER_ID) return@launch
+
+            try {
+                Log.d("DeckViewModel", "🔄 Forçando ressincronização de quizzes...")
+
+                // Limpar todos os quizzes do cache
+                quizDao.deleteAllQuizzesForUser(userId)
+                questionDao.deleteQuestionsByQuizId(-1, userId) // Limpa todas
+                answerDao.deleteAnswersByQuestionId(-1, userId) // Limpa todas
+
+                Log.d("DeckViewModel", "✅ Cache de quizzes limpo")
+
+                // Buscar novamente
+                fetchDecks(showLoading = true)
+
+            } catch (e: Exception) {
+                Log.e("DeckViewModel", "❌ Erro ao forçar resync: ${e.message}")
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.example.flashify.view.ui.screen
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge

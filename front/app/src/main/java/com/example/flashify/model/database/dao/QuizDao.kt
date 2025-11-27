@@ -1,6 +1,7 @@
 package com.example.flashify.model.database.dao
 
 import androidx.room.*
+import com.example.flashify.model.data.QuizWithQuestionCount
 import com.example.flashify.model.database.dataclass.*
 import kotlinx.coroutines.flow.Flow
 
@@ -42,6 +43,31 @@ interface QuizDao {
      */
     @Query("SELECT * FROM quizzes WHERE userId = :userId")
     suspend fun getQuizzesForDebug(userId: Int): List<QuizEntity>
+
+    /**
+     * ✅ MÉTODO DE DIAGNÓSTICO
+     * Use este método para verificar se os índices estão funcionando
+     */
+    @Query("""
+        SELECT q.*, COUNT(qq.id) as question_count
+        FROM quizzes q
+        LEFT JOIN quiz_questions qq ON q.id = qq.quizId AND qq.userId = :userId
+        WHERE q.userId = :userId
+        GROUP BY q.id
+    """)
+    suspend fun getDiagnosticQuizzes(userId: Int): List<QuizWithQuestionCount>
+
+    /**
+     * ✅ QUERY ALTERNATIVA SEM USAR O ÍNDICE COMPOSTO
+     * Use se a query normal falhar
+     */
+    @Query("""
+        SELECT * FROM quizzes 
+        WHERE documentId = :documentId 
+        AND userId = :userId 
+        LIMIT 1
+    """)
+    suspend fun getQuizByDocumentIdAlternative(documentId: Int, userId: Int): QuizEntity?
 }
 
 @Dao

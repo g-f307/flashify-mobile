@@ -1,6 +1,9 @@
 package com.example.flashify.model.data
 
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.room.ColumnInfo
+import androidx.room.Embedded
+import com.example.flashify.model.database.dataclass.QuizEntity
 import com.google.gson.annotations.SerializedName
 
 
@@ -221,6 +224,11 @@ data class SubmitQuizRequest(
     val score: Float,
     @SerializedName("correct_answers") val correctAnswers: Int,
     @SerializedName("total_questions") val totalQuestions: Int
+)
+
+data class QuizWithQuestionCount(
+    @Embedded val quiz: QuizEntity,
+    @ColumnInfo(name = "question_count") val questionCount: Int
 )
 
 // --- DTOs para Biblioteca com Pastas ---

@@ -23,7 +23,7 @@ import com.example.flashify.model.database.dataclass.*
         QuizAttemptEntity::class,
         StudyLogEntity::class
     ],
-    version = 5, // ✅ INCREMENTAR DE 4 PARA 5
+    version = 7, // ✅ INCREMENTAR PARA 6
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -47,13 +47,16 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "flashify_database"
                 )
-                    .fallbackToDestructiveMigration() // ✅ Recria DB com novos índices
+                    .fallbackToDestructiveMigration() // ✅ Força recriação
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
 
+        /**
+         * ✅ NOVO: Limpar instância para forçar recriação
+         */
         fun clearInstance() {
             INSTANCE?.close()
             INSTANCE = null
