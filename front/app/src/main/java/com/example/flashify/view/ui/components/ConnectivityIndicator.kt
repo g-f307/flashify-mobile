@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.example.flashify.model.manager.ConnectivityState
 
 /**
- * ✅ Banner de conectividade que respeita os insets do sistema
+ * ✅ Banner de conectividade que respeita os insets do sistema (CORRIGIDO)
  */
 @Composable
 fun ConnectivityBanner(
@@ -28,7 +28,6 @@ fun ConnectivityBanner(
     onSyncClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // ✅ Animação de entrada/saída
     AnimatedVisibility(
         visible = !connectivityState.isOnline || connectivityState.pendingSyncCount > 0,
         enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
@@ -37,18 +36,18 @@ fun ConnectivityBanner(
     ) {
         Surface(
             color = when {
-                !connectivityState.isOnline -> Color(0xFFFF9800) // Laranja para offline
-                connectivityState.isSyncing -> Color(0xFF2196F3) // Azul para sincronizando
-                connectivityState.pendingSyncCount > 0 -> Color(0xFFFFC107) // Amarelo para pendente
-                else -> Color(0xFF4CAF50) // Verde para online
+                !connectivityState.isOnline -> Color(0xFFFF9800)
+                connectivityState.isSyncing -> Color(0xFF2196F3)
+                connectivityState.pendingSyncCount > 0 -> Color(0xFFFFC107)
+                else -> Color(0xFF4CAF50)
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding() // ✅ CRÍTICO: Respeita a barra de status
         ) {
-            // ✅ Adicionar statusBarsPadding para não ficar atrás da barra de status
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding() // ✅ IMPORTANTE: respeita a barra de status
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .clickable(enabled = connectivityState.pendingSyncCount > 0) {
                         onSyncClick()
@@ -61,10 +60,8 @@ fun ConnectivityBanner(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Ícone animado
                     when {
                         connectivityState.isSyncing -> {
-                            // Ícone rotativo durante sincronização
                             val rotation by rememberInfiniteTransition(label = "rotation").animateFloat(
                                 initialValue = 0f,
                                 targetValue = 360f,

@@ -13,6 +13,7 @@ import com.example.flashify.model.data.TextDeckCreateRequest
 import com.example.flashify.model.database.dao.DeckDao
 import com.example.flashify.model.database.dao.FlashcardDao
 import com.example.flashify.model.database.dataclass.DeckEntity
+import com.example.flashify.model.manager.SyncManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.network.ApiService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -82,7 +83,8 @@ class DeckViewModel @Inject constructor(
     private val apiService: ApiService,
     private val deckDao: DeckDao,
     private val flashcardDao: FlashcardDao,
-    private val contentResolver: ContentResolver
+    private val contentResolver: ContentResolver,
+    private val syncManager: SyncManager // ✅ NOVO: Injeção do SyncManager
 ) : ViewModel() {
 
     private val _deckListState = MutableStateFlow<DeckListState>(DeckListState.Loading)
@@ -106,7 +108,6 @@ class DeckViewModel @Inject constructor(
     private val _addContentState = MutableStateFlow<AddContentState>(AddContentState.Idle)
     val addContentState = _addContentState.asStateFlow()
 
-    // ✅ CORRIGIDO: StateFlow para sincronização de dados
     private val _syncCompleted = MutableStateFlow(false)
     val syncCompleted = _syncCompleted.asStateFlow()
 
@@ -118,6 +119,9 @@ class DeckViewModel @Inject constructor(
 
     private fun getCurrentUserId(): Int = tokenManager.getUserId()
 
+    /**
+     * ✅ CORRIGIDO: Busca decks com suporte offline completo
+     */
     fun fetchDecks(showLoading: Boolean = true) {
         viewModelScope.launch {
             if (showLoading) {
@@ -136,30 +140,48 @@ class DeckViewModel @Inject constructor(
                 return@launch
             }
 
+            // ✅ 1. Carregar do cache local PRIMEIRO
             try {
-                val networkDecksResponse = apiService.getDecks(token)
-
-                val recentDeck = networkDecksResponse
-                    .filter { it.studiedFlashcards > 0 }
-                    .maxByOrNull { it.createdAt }
-
-                _deckListState.value = DeckListState.Success(networkDecksResponse, recentDeck)
-
-                val networkDeckEntities = networkDecksResponse.map { it.toDeckEntity(userId) }
-                deckDao.insertDecks(networkDeckEntities)
-
-            } catch (e: Exception) {
-                println("Aviso: Falha ao buscar decks da rede: ${e.message}")
                 val localDecks = deckDao.getAllDecksForUser(userId).map { it.toDeckResponse() }
 
                 if (localDecks.isNotEmpty()) {
                     val recentDeck = localDecks
                         .filter { it.studiedFlashcards > 0 }
                         .maxByOrNull { it.createdAt }
+
                     _deckListState.value = DeckListState.Success(localDecks, recentDeck)
-                } else {
-                    _deckListState.value = DeckListState.Error("Falha ao carregar decks: ${e.message}")
+                    Log.d("DeckViewModel", "📦 ${localDecks.size} decks carregados do cache")
                 }
+            } catch (e: Exception) {
+                Log.e("DeckViewModel", "❌ Erro ao ler cache: ${e.message}")
+            }
+
+            // ✅ 2. Se estiver ONLINE, sincronizar com servidor
+            if (syncManager.isOnline()) {
+                try {
+                    val networkDecksResponse = apiService.getDecks(token)
+
+                    val recentDeck = networkDecksResponse
+                        .filter { it.studiedFlashcards > 0 }
+                        .maxByOrNull { it.createdAt }
+
+                    _deckListState.value = DeckListState.Success(networkDecksResponse, recentDeck)
+
+                    // Atualizar cache
+                    val networkDeckEntities = networkDecksResponse.map { it.toDeckEntity(userId) }
+                    deckDao.insertDecks(networkDeckEntities)
+
+                    Log.d("DeckViewModel", "🔄 ${networkDecksResponse.size} decks sincronizados")
+
+                } catch (e: Exception) {
+                    Log.e("DeckViewModel", "⚠️ Erro na rede: ${e.message}")
+                    // Mantém os dados do cache se a rede falhar
+                    if (_deckListState.value !is DeckListState.Success) {
+                        _deckListState.value = DeckListState.Error("Falha ao conectar. Mostrando dados locais.")
+                    }
+                }
+            } else {
+                Log.d("DeckViewModel", "📵 Modo offline - usando cache")
             }
         }
     }
@@ -207,7 +229,6 @@ class DeckViewModel @Inject constructor(
         }
     }
 
-    // ✅ CORRIGIDO: Adicionar Flashcards com sincronização adequada
     fun addFlashcardsToDeck(documentId: Int, quantity: Int, difficulty: String) {
         viewModelScope.launch {
             _addContentState.value = AddContentState.Loading
@@ -220,16 +241,13 @@ class DeckViewModel @Inject constructor(
             }
 
             try {
-                // 1️⃣ Fazer a requisição ao backend
                 val request = com.example.flashify.model.data.AddFlashcardsRequest(numFlashcards = quantity)
                 apiService.addMoreFlashcards(token, documentId, request)
 
                 Log.d("DeckViewModel", "✅ Requisição de flashcards enviada ao backend")
 
-                // 2️⃣ Aguardar 2 segundos para o backend processar
                 kotlinx.coroutines.delay(2000)
 
-                // 3️⃣ Buscar dados atualizados
                 try {
                     fetchDecks(showLoading = false)
                     fetchDeckStats(documentId, showLoading = false)
@@ -237,10 +255,8 @@ class DeckViewModel @Inject constructor(
 
                     Log.d("DeckViewModel", "📥 Dados atualizados buscados")
 
-                    // 4️⃣ Aguardar mais 1 segundo para garantir que StateFlows sejam atualizados
                     kotlinx.coroutines.delay(1000)
 
-                    // 5️⃣ Verificar se os dados foram realmente atualizados
                     val currentStats = _deckStatsState.value
                     if (currentStats is DeckStatsState.Success) {
                         Log.d("DeckViewModel", "✅ Stats confirmadas: ${currentStats.stats.flashcards.total} flashcards")
@@ -252,7 +268,7 @@ class DeckViewModel @Inject constructor(
 
                 } catch (e: Exception) {
                     Log.e("DeckViewModel", "❌ Erro na sincronização: ${e.message}")
-                    _syncCompleted.value = true // Permite continuar mesmo com erro
+                    _syncCompleted.value = true
                 }
 
                 _addContentState.value = AddContentState.Success("Novos flashcards adicionados com sucesso!")
@@ -264,7 +280,6 @@ class DeckViewModel @Inject constructor(
         }
     }
 
-    // ✅ CORRIGIDO: Adicionar Perguntas com sincronização adequada
     fun addQuestionsToQuiz(documentId: Int, quantity: Int, difficulty: String) {
         viewModelScope.launch {
             _addContentState.value = AddContentState.Loading
@@ -277,16 +292,13 @@ class DeckViewModel @Inject constructor(
             }
 
             try {
-                // 1️⃣ Fazer a requisição ao backend
                 val request = com.example.flashify.model.data.AddQuestionsRequest(numQuestions = quantity)
                 apiService.addMoreQuestions(token, documentId, request)
 
                 Log.d("DeckViewModel", "✅ Requisição de perguntas enviada ao backend")
 
-                // 2️⃣ Aguardar 2 segundos para o backend processar
                 kotlinx.coroutines.delay(2000)
 
-                // 3️⃣ Buscar dados atualizados
                 try {
                     fetchDecks(showLoading = false)
                     fetchDeckStats(documentId, showLoading = false)
@@ -294,10 +306,8 @@ class DeckViewModel @Inject constructor(
 
                     Log.d("DeckViewModel", "📥 Dados atualizados buscados")
 
-                    // 4️⃣ Aguardar mais 1 segundo para garantir que StateFlows sejam atualizados
                     kotlinx.coroutines.delay(1000)
 
-                    // 5️⃣ Verificar se os dados foram realmente atualizados
                     val currentStats = _deckStatsState.value
                     if (currentStats is DeckStatsState.Success) {
                         Log.d("DeckViewModel", "✅ Stats confirmadas")
@@ -309,7 +319,7 @@ class DeckViewModel @Inject constructor(
 
                 } catch (e: Exception) {
                     Log.e("DeckViewModel", "❌ Erro na sincronização: ${e.message}")
-                    _syncCompleted.value = true // Permite continuar mesmo com erro
+                    _syncCompleted.value = true
                 }
 
                 _addContentState.value = AddContentState.Success("Novas perguntas adicionadas com sucesso!")
@@ -330,7 +340,6 @@ class DeckViewModel @Inject constructor(
         _deckStatsState.value = DeckStatsState.Idle
     }
 
-    // ✅ CORRIGIDO: Verificar limite ANTES de criar deck
     fun createDeckFromText(
         title: String,
         text: String,
@@ -340,7 +349,6 @@ class DeckViewModel @Inject constructor(
         folderId: Int? = null
     ) {
         viewModelScope.launch {
-            // ✅ VERIFICAR LIMITE ANTES DE PROCESSAR
             val currentLimit = _generationLimitState.value
             if (currentLimit is GenerationLimitState.Success) {
                 if (currentLimit.info.used >= currentLimit.info.limit) {
@@ -381,7 +389,6 @@ class DeckViewModel @Inject constructor(
         }
     }
 
-    // ✅ CORRIGIDO: Verificar limite ANTES de criar deck
     fun createDeckFromFile(
         title: String,
         fileUri: Uri,
@@ -391,7 +398,6 @@ class DeckViewModel @Inject constructor(
         folderId: Int? = null
     ) {
         viewModelScope.launch {
-            // ✅ VERIFICAR LIMITE ANTES DE PROCESSAR
             val currentLimit = _generationLimitState.value
             if (currentLimit is GenerationLimitState.Success) {
                 if (currentLimit.info.used >= currentLimit.info.limit) {
@@ -559,10 +565,8 @@ class DeckViewModel @Inject constructor(
         _deckCreationState.value = DeckCreationState.Idle
     }
 
-    // ✅ CORRIGIDO: Verificar limite ANTES de gerar
     fun generateFlashcardsForDocument(documentId: Int) {
         viewModelScope.launch {
-            // ✅ VERIFICAR LIMITE ANTES DE PROCESSAR
             val currentLimit = _generationLimitState.value
             if (currentLimit is GenerationLimitState.Success) {
                 if (currentLimit.info.used >= currentLimit.info.limit) {
@@ -596,10 +600,8 @@ class DeckViewModel @Inject constructor(
         }
     }
 
-    // ✅ CORRIGIDO: Verificar limite ANTES de gerar
     fun generateQuizForDocument(documentId: Int) {
         viewModelScope.launch {
-            // ✅ VERIFICAR LIMITE ANTES DE PROCESSAR
             val currentLimit = _generationLimitState.value
             if (currentLimit is GenerationLimitState.Success) {
                 if (currentLimit.info.used >= currentLimit.info.limit) {

@@ -7,6 +7,9 @@ import com.example.flashify.model.data.CheckAnswerRequest
 import com.example.flashify.model.data.CheckAnswerResponse
 import com.example.flashify.model.data.QuizResponse
 import com.example.flashify.model.data.SubmitQuizRequest
+import com.example.flashify.model.database.dao.*
+import com.example.flashify.model.database.dataclass.*
+import com.example.flashify.model.manager.SyncManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.network.ApiService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,7 +42,12 @@ sealed class QuizSubmitState {
 @HiltViewModel
 class QuizViewModel @Inject constructor(
     private val tokenManager: TokenManager,
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val syncManager: SyncManager, // ✅ NOVO
+    private val quizDao: QuizDao, // ✅ NOVO
+    private val questionDao: QuestionDao, // ✅ NOVO
+    private val answerDao: AnswerDao, // ✅ NOVO
+    private val quizAttemptDao: QuizAttemptDao // ✅ NOVO
 ) : ViewModel() {
 
     private val _quizState = MutableStateFlow<QuizState>(QuizState.Idle)
@@ -51,24 +59,120 @@ class QuizViewModel @Inject constructor(
     private val _quizSubmitState = MutableStateFlow<QuizSubmitState>(QuizSubmitState.Idle)
     val quizSubmitState: StateFlow<QuizSubmitState> = _quizSubmitState
 
+    private fun getCurrentUserId(): Int = tokenManager.getUserId()
+
+    /**
+     * ✅ NOVO: Carregar quiz com suporte offline
+     */
     fun loadQuiz(documentId: Int) {
         viewModelScope.launch {
             _quizState.value = QuizState.Loading
+            val userId = getCurrentUserId()
+
+            if (userId == TokenManager.INVALID_USER_ID) {
+                _quizState.value = QuizState.Error("Utilizador inválido")
+                return@launch
+            }
+
+            // 1️⃣ Tentar carregar do cache local primeiro
             try {
-                val token = tokenManager.getToken()
-                if (token == null) {
-                    _quizState.value = QuizState.Error("Token de autenticação não encontrado")
+                val localQuiz = quizDao.getQuizByDocumentId(documentId, userId)
+
+                if (localQuiz != null) {
+                    val questions = questionDao.getQuestionsByQuizId(localQuiz.id, userId)
+                    val quizResponse = localQuiz.toQuizResponse(questions, answerDao, userId)
+
+                    _quizState.value = QuizState.Success(quizResponse)
+                    Log.d("QuizViewModel", "📦 Quiz carregado do cache")
+
+                    // Se estiver online, atualizar em background
+                    if (syncManager.isOnline()) {
+                        loadQuizFromNetwork(documentId, userId, silent = true)
+                    }
                     return@launch
                 }
+            } catch (e: Exception) {
+                Log.e("QuizViewModel", "❌ Erro ao ler cache: ${e.message}")
+            }
 
-                val documentDetail = apiService.getDocumentDetailWithQuiz(token, documentId)
+            // 2️⃣ Cache vazio - buscar da rede
+            if (syncManager.isOnline()) {
+                loadQuizFromNetwork(documentId, userId, silent = false)
+            } else {
+                _quizState.value = QuizState.Error(
+                    "Este quiz não está disponível offline. Conecte-se à internet."
+                )
+            }
+        }
+    }
 
-                if (documentDetail.quiz != null) {
-                    _quizState.value = QuizState.Success(documentDetail.quiz)
-                } else {
+    /**
+     * ✅ NOVO: Buscar quiz da rede e salvar no cache
+     */
+    private suspend fun loadQuizFromNetwork(documentId: Int, userId: Int, silent: Boolean) {
+        val token = tokenManager.getToken()
+        if (token == null) {
+            if (!silent) {
+                _quizState.value = QuizState.Error("Token de autenticação não encontrado")
+            }
+            return
+        }
+
+        try {
+            val documentDetail = apiService.getDocumentDetailWithQuiz(token, documentId)
+
+            if (documentDetail.quiz != null) {
+                // Salvar no cache
+                val quizEntity = QuizEntity(
+                    id = documentDetail.quiz.id,
+                    title = documentDetail.quiz.title,
+                    documentId = documentDetail.quiz.documentId,
+                    userId = userId,
+                    isSynced = true
+                )
+                quizDao.insertQuiz(quizEntity)
+
+                // Salvar perguntas
+                val questionEntities = documentDetail.quiz.questions.mapIndexed { index, q ->
+                    QuestionEntity(
+                        id = q.id,
+                        text = q.text,
+                        quizId = q.quizId,
+                        userId = userId,
+                        orderIndex = index,
+                        isSynced = true
+                    )
+                }
+                questionDao.insertQuestions(questionEntities)
+
+                // Salvar respostas
+                documentDetail.quiz.questions.forEach { question ->
+                    val answerEntities = question.answers.mapIndexed { index, a ->
+                        AnswerEntity(
+                            id = a.id,
+                            text = a.text,
+                            isCorrect = a.isCorrect,
+                            explanation = a.explanation,
+                            questionId = a.questionId,
+                            userId = userId,
+                            orderIndex = index,
+                            isSynced = true
+                        )
+                    }
+                    answerDao.insertAnswers(answerEntities)
+                }
+
+                Log.d("QuizViewModel", "🔄 Quiz sincronizado e salvo no cache")
+
+                _quizState.value = QuizState.Success(documentDetail.quiz)
+            } else {
+                if (!silent) {
                     _quizState.value = QuizState.Error("Este deck não possui um quiz")
                 }
-            } catch (e: Exception) {
+            }
+        } catch (e: Exception) {
+            Log.e("QuizViewModel", "❌ Erro ao carregar quiz: ${e.message}")
+            if (!silent) {
                 _quizState.value = QuizState.Error(e.message ?: "Erro ao carregar quiz")
             }
         }
@@ -77,6 +181,13 @@ class QuizViewModel @Inject constructor(
     fun checkAnswer(questionId: Int, answerId: Int) {
         viewModelScope.launch {
             _answerCheckState.value = AnswerCheckState.Loading
+
+            // ✅ Se estiver OFFLINE, verificar localmente
+            if (!syncManager.isOnline()) {
+                checkAnswerLocally(questionId, answerId)
+                return@launch
+            }
+
             try {
                 val token = tokenManager.getToken()
                 if (token == null) {
@@ -89,28 +200,99 @@ class QuizViewModel @Inject constructor(
 
                 _answerCheckState.value = AnswerCheckState.Success(result)
             } catch (e: Exception) {
-                _answerCheckState.value = AnswerCheckState.Error(e.message ?: "Erro ao verificar resposta")
+                // ✅ Se falhar na rede, tentar localmente
+                Log.w("QuizViewModel", "⚠️ Erro na rede, verificando localmente")
+                checkAnswerLocally(questionId, answerId)
             }
         }
     }
 
+    /**
+     * ✅ NOVO: Verificar resposta usando dados locais
+     */
+    private suspend fun checkAnswerLocally(questionId: Int, answerId: Int) {
+        try {
+            val userId = getCurrentUserId()
+            val answers = answerDao.getAnswersByQuestionId(questionId, userId)
+
+            val selectedAnswer = answers.find { it.id == answerId }
+            val correctAnswer = answers.find { it.isCorrect }
+
+            if (selectedAnswer != null && correctAnswer != null) {
+                val result = CheckAnswerResponse(
+                    isCorrect = selectedAnswer.isCorrect,
+                    correctAnswerId = correctAnswer.id,
+                    explanation = selectedAnswer.explanation ?: correctAnswer.explanation ?: "Sem explicação disponível"
+                )
+
+                _answerCheckState.value = AnswerCheckState.Success(result)
+                Log.d("QuizViewModel", "✅ Resposta verificada localmente (offline)")
+            } else {
+                _answerCheckState.value = AnswerCheckState.Error("Não foi possível verificar a resposta")
+            }
+        } catch (e: Exception) {
+            Log.e("QuizViewModel", "❌ Erro ao verificar resposta localmente: ${e.message}")
+            _answerCheckState.value = AnswerCheckState.Error("Erro ao verificar resposta")
+        }
+    }
+
+    /**
+     * ✅ NOVO: Submeter quiz com suporte offline
+     */
     fun submitQuiz(quizId: Int, score: Float, correctAnswers: Int, totalQuestions: Int) {
         viewModelScope.launch {
             _quizSubmitState.value = QuizSubmitState.Loading
-            try {
-                val token = tokenManager.getToken()
-                if (token == null) {
-                    _quizSubmitState.value = QuizSubmitState.Error("Token de autenticação não encontrado")
-                    return@launch
-                }
+            val userId = getCurrentUserId()
 
-                val request = SubmitQuizRequest(score, correctAnswers, totalQuestions)
-                apiService.submitQuizAttempt(token, quizId, request)
-
-                _quizSubmitState.value = QuizSubmitState.Success
-            } catch (e: Exception) {
-                _quizSubmitState.value = QuizSubmitState.Error(e.message ?: "Erro ao submeter quiz")
+            if (userId == TokenManager.INVALID_USER_ID) {
+                _quizSubmitState.value = QuizSubmitState.Error("Utilizador inválido")
+                return@launch
             }
+
+            // 1️⃣ Salvar tentativa localmente SEMPRE
+            try {
+                val attemptEntity = QuizAttemptEntity(
+                    quizId = quizId,
+                    userId = userId,
+                    score = score,
+                    correctAnswers = correctAnswers,
+                    totalQuestions = totalQuestions,
+                    attemptDate = System.currentTimeMillis(),
+                    isSynced = false
+                )
+
+                quizAttemptDao.insertAttempt(attemptEntity)
+                Log.d("QuizViewModel", "💾 Tentativa salva localmente")
+
+            } catch (e: Exception) {
+                Log.e("QuizViewModel", "❌ Erro ao salvar tentativa localmente: ${e.message}")
+            }
+
+            // 2️⃣ Se estiver online, sincronizar imediatamente
+            if (syncManager.isOnline()) {
+                val token = tokenManager.getToken()
+                if (token != null) {
+                    try {
+                        val request = SubmitQuizRequest(score, correctAnswers, totalQuestions)
+                        apiService.submitQuizAttempt(token, quizId, request)
+
+                        // Marcar como sincronizado
+                        val unsyncedAttempts = quizAttemptDao.getUnsyncedAttempts(userId)
+                        val thisAttempt = unsyncedAttempts.lastOrNull { it.quizId == quizId }
+                        thisAttempt?.let {
+                            quizAttemptDao.markAttemptAsSynced(it.localId)
+                            Log.d("QuizViewModel", "✅ Tentativa sincronizada")
+                        }
+
+                    } catch (e: Exception) {
+                        Log.w("QuizViewModel", "⚠️ Erro ao sincronizar: ${e.message} (será sincronizado depois)")
+                    }
+                }
+            } else {
+                Log.d("QuizViewModel", "📵 Offline - tentativa será sincronizada quando estiver online")
+            }
+
+            _quizSubmitState.value = QuizSubmitState.Success
         }
     }
 
@@ -142,5 +324,40 @@ class QuizViewModel @Inject constructor(
                 Log.e("QuizViewModel", "❌ Erro ao atualizar stats: ${e.message}")
             }
         }
+    }
+
+    /**
+     * ✅ NOVO: Converter entidades locais para resposta da API
+     */
+    private suspend fun QuizEntity.toQuizResponse(
+        questions: List<QuestionEntity>,
+        answerDao: AnswerDao,
+        userId: Int
+    ): QuizResponse {
+        val questionResponses = questions.map { question ->
+            val answers = answerDao.getAnswersByQuestionId(question.id, userId)
+
+            com.example.flashify.model.data.QuestionResponse(
+                id = question.id,
+                text = question.text,
+                quizId = question.quizId,
+                answers = answers.map { answer ->
+                    com.example.flashify.model.data.AnswerResponse(
+                        id = answer.id,
+                        text = answer.text,
+                        isCorrect = answer.isCorrect,
+                        explanation = answer.explanation,
+                        questionId = answer.questionId
+                    )
+                }
+            )
+        }
+
+        return QuizResponse(
+            id = this.id,
+            title = this.title,
+            documentId = this.documentId,
+            questions = questionResponses
+        )
     }
 }
