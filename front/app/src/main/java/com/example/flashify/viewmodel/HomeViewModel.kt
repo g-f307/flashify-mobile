@@ -4,11 +4,15 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashify.model.data.ProgressStatsResponse
+import com.example.flashify.model.manager.ConnectivityState
+import com.example.flashify.model.manager.SyncManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.network.ApiService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -44,11 +48,20 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val tokenManager: TokenManager,
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val syncManager: SyncManager // ✅ 1. Injeção do SyncManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState = _uiState.asStateFlow()
+
+    // ✅ 2. Expondo o estado de conectividade para a UI
+    val connectivityState = syncManager.connectivityState
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ConnectivityState()
+        )
 
     private val SESSION_DURATION_SECONDS = 15 * 60
 
@@ -57,6 +70,11 @@ class HomeViewModel @Inject constructor(
     init {
         fetchProgressData()
         observeStudyTimer()
+    }
+
+    // ✅ 3. Função para forçar sincronização (chamada pela UI)
+    fun forceSyncNow() {
+        syncManager.forceSyncNow()
     }
 
     private fun fetchProgressData() {

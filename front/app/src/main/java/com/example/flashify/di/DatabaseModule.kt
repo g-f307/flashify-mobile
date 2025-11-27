@@ -3,8 +3,7 @@ package com.example.flashify.di
 import android.content.Context
 import androidx.room.Room
 import com.example.flashify.model.database.AppDatabase
-import com.example.flashify.model.database.dao.DeckDao
-import com.example.flashify.model.database.dao.FlashcardDao
+import com.example.flashify.model.database.dao.*
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,6 +27,8 @@ object DatabaseModule {
             .build()
     }
 
+    // ===== DAOs EXISTENTES =====
+
     @Provides
     @Singleton
     fun provideDeckDao(database: AppDatabase): DeckDao {
@@ -38,5 +39,37 @@ object DatabaseModule {
     @Singleton
     fun provideFlashcardDao(database: AppDatabase): FlashcardDao {
         return database.flashcardDao()
+    }
+
+    // ===== NOVOS DAOs PARA QUIZ =====
+
+    @Provides
+    @Singleton
+    fun provideQuizDao(database: AppDatabase): QuizDao {
+        return database.quizDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideQuestionDao(database: AppDatabase): QuestionDao {
+        return database.questionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAnswerDao(database: AppDatabase): AnswerDao {
+        return database.answerDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideQuizAttemptDao(database: AppDatabase): QuizAttemptDao {
+        return database.quizAttemptDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideStudyLogDao(database: AppDatabase): StudyLogDao {
+        return database.studyLogDao()
     }
 }

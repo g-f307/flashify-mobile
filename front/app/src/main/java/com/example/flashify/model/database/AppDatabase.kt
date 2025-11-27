@@ -4,17 +4,39 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.flashify.model.database.dao.DeckDao
-import com.example.flashify.model.database.dao.FlashcardDao
-import com.example.flashify.model.database.dataclass.DeckEntity
-import com.example.flashify.model.database.dataclass.FlashcardEntity
+import com.example.flashify.model.database.dao.*
+import com.example.flashify.model.database.dataclass.*
 
-// 1. Incremente a versão (ex: de 1 para 2)
-@Database(entities = [DeckEntity::class, FlashcardEntity::class], version = 2, exportSchema = false)
+/**
+ * Database principal da aplicação com suporte completo a Offline-First
+ *
+ * Versão 3: Adicionadas tabelas de Quiz, tentativas e logs de sincronização
+ */
+@Database(
+    entities = [
+        DeckEntity::class,
+        FlashcardEntity::class,
+        QuizEntity::class,
+        QuestionEntity::class,
+        AnswerEntity::class,
+        QuizAttemptEntity::class,
+        StudyLogEntity::class
+    ],
+    version = 3,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
 
+    // DAOs existentes
     abstract fun deckDao(): DeckDao
     abstract fun flashcardDao(): FlashcardDao
+
+    // Novos DAOs para Quiz
+    abstract fun quizDao(): QuizDao
+    abstract fun questionDao(): QuestionDao
+    abstract fun answerDao(): AnswerDao
+    abstract fun quizAttemptDao(): QuizAttemptDao
+    abstract fun studyLogDao(): StudyLogDao
 
     companion object {
         @Volatile
@@ -27,12 +49,21 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "flashify_database"
                 )
-                    // 2. Adicione esta linha para lidar com a mudança (apaga dados antigos!)
+                    // Estratégia de migração destrutiva (para desenvolvimento)
+                    // Em produção, use Migrations adequadas
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
             }
+        }
+
+        /**
+         * Limpa a instância do database (útil para testes)
+         */
+        fun clearInstance() {
+            INSTANCE?.close()
+            INSTANCE = null
         }
     }
 }

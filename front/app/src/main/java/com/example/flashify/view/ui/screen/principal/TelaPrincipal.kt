@@ -40,6 +40,8 @@ import com.example.flashify.model.data.DeckResponse
 import com.example.flashify.model.data.NavItem
 import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.util.*
+import com.example.flashify.view.ui.components.CompactConnectivityIndicator
+import com.example.flashify.view.ui.components.ConnectivityBanner
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
 import com.example.flashify.viewmodel.*
@@ -50,11 +52,15 @@ fun TelaPrincipal(
     navController: NavController,
     deckViewModel: DeckViewModel = hiltViewModel(),
     homeViewModel: HomeViewModel = hiltViewModel()
+    // ✅ REMOVIDO: syncManager: SyncManager = hiltViewModel()
+    // SyncManager não é ViewModel, acessamos via HomeViewModel
 ) {
-    // --- CONFIGURAÇÃO DE TEMA E ESTADO ---
     val context = LocalContext.current
     val themeManager = remember { ThemeManager(context) }
     val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
+
+    // ✅ Estado de conectividade vem do HomeViewModel
+    val connectivityState by homeViewModel.connectivityState.collectAsState()
 
     val deckState by deckViewModel.deckListState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsState()
@@ -88,6 +94,15 @@ fun TelaPrincipal(
 
     Scaffold(
         containerColor = Color.Transparent,
+        // ✅ Banner de conectividade no topo
+        topBar = {
+            ConnectivityBanner(
+                connectivityState = connectivityState,
+                onSyncClick = {
+                    homeViewModel.forceSyncNow() // ✅ Chama via ViewModel
+                }
+            )
+        },
         bottomBar = {
             Column(modifier = Modifier.navigationBarsPadding()) {
                 NavegacaoBotaoAbaixo(
@@ -117,14 +132,50 @@ fun TelaPrincipal(
             ) {
                 Spacer(Modifier.height(24.dp))
 
-                // CABEÇALHO (HEADER)
-                CabecalhoUsuario(
-                    homeViewModel = homeViewModel,
-                    settingsViewModel = hiltViewModel(),
-                    generationLimitState = generationLimitState,
-                    themeManager = themeManager,
-                    isDarkTheme = isDarkTheme
-                )
+                // ✅ CABEÇALHO com indicador compacto de conectividade
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Linha 1: Avatar e Ações (com indicador de conectividade)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Avatar
+                        AvatarSection(
+                            settingsViewModel = hiltViewModel()
+                        )
+
+                        // Ações + Indicador
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Badge de Gerações
+                            GenerationLimitBadge(
+                                generationLimitState = generationLimitState,
+                                isDarkTheme = isDarkTheme
+                            )
+
+                            // ✅ Indicador compacto de conectividade
+                            CompactConnectivityIndicator(
+                                connectivityState = connectivityState
+                            )
+
+                            // Botão de tema
+                            ThemeToggleButton(
+                                themeManager = themeManager,
+                                isDarkTheme = isDarkTheme
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Linha 2: Saudação e Nome
+                    GreetingSection(
+                        settingsViewModel = hiltViewModel()
+                    )
+                }
 
                 Spacer(Modifier.height(32.dp))
 
@@ -170,26 +221,146 @@ fun TelaPrincipal(
     }
 }
 
+// ===== COMPONENTES SEPARADOS PARA MELHOR ORGANIZAÇÃO =====
+
 @Composable
-fun CabecalhoUsuario(
-    homeViewModel: HomeViewModel,
-    settingsViewModel: SettingsViewModel,
-    generationLimitState: GenerationLimitState,
-    themeManager: ThemeManager,
-    isDarkTheme: Boolean
+private fun AvatarSection(
+    settingsViewModel: SettingsViewModel
 ) {
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-
-    // Cores da Paleta
     val primaryColor = MaterialTheme.colorScheme.primary
-    val cyanColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
 
-    // Obtém informações do usuário
     val initial = when (val state = userState) {
         is UserState.Success -> state.user.username.firstOrNull()?.uppercaseChar()?.toString()
         else -> "U"
     }
+
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .clip(CircleShape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        primaryColor.copy(alpha = 0.3f),
+                        primaryColor.copy(alpha = 0.15f)
+                    )
+                )
+            )
+            .border(2.dp, primaryColor.copy(alpha = 0.4f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initial ?: "U",
+            fontWeight = FontWeight.ExtraBold,
+            color = primaryColor,
+            fontSize = 28.sp
+        )
+    }
+}
+
+@Composable
+private fun GenerationLimitBadge(
+    generationLimitState: GenerationLimitState,
+    isDarkTheme: Boolean
+) {
+    if (generationLimitState is GenerationLimitState.Success) {
+        val info = generationLimitState.info
+        val isLimitReached = info.used >= info.limit
+        val consumptionPercentage = if (info.limit > 0) {
+            info.used.toFloat() / info.limit.toFloat()
+        } else 0f
+
+        val badgeColor = if (isLimitReached) {
+            MaterialTheme.colorScheme.error
+        } else {
+            if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF00796B)
+        }
+
+        val badgeBg = if (isDarkTheme) {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        } else {
+            Color(0xFFE0E0E0)
+        }
+
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Texto com ícone
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Bolt,
+                    contentDescription = "Energia",
+                    tint = badgeColor,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "${info.used}/${info.limit}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Barra de progresso
+            Box(
+                modifier = Modifier
+                    .width(100.dp)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(badgeBg)
+                    .then(
+                        if (!isDarkTheme) {
+                            Modifier.border(0.5.dp, Color(0xFFBDBDBD), RoundedCornerShape(4.dp))
+                        } else Modifier
+                    )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(consumptionPercentage)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(badgeColor)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeToggleButton(
+    themeManager: ThemeManager,
+    isDarkTheme: Boolean
+) {
+    val scope = rememberCoroutineScope()
+
+    IconButton(
+        onClick = { scope.launch { themeManager.toggleTheme() } },
+        modifier = Modifier
+            .size(42.dp)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                CircleShape
+            )
+    ) {
+        Icon(
+            imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
+            contentDescription = "Alterar Tema",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
+private fun GreetingSection(
+    settingsViewModel: SettingsViewModel
+) {
+    val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
 
     val fullName = when (val state = userState) {
         is UserState.Success -> {
@@ -201,158 +372,30 @@ fun CabecalhoUsuario(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth()
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        // Linha superior: Avatar e Ações
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // --- PERFIL (ESQUERDA) ---
-            // Avatar com gradiente sutil
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                primaryColor.copy(alpha = 0.3f),
-                                primaryColor.copy(alpha = 0.15f)
-                            )
-                        )
-                    )
-                    .border(2.dp, primaryColor.copy(alpha = 0.4f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = initial ?: "U",
-                    fontWeight = FontWeight.ExtraBold,
-                    color = primaryColor,
-                    fontSize = 28.sp
-                )
-            }
+        Text(
+            "Olá,",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
-            // --- AÇÕES (DIREITA) ---
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // BADGE DE ENERGIA (GERAÇÕES) COM BARRA DE CONSUMO
-                if (generationLimitState is GenerationLimitState.Success) {
-                    val info = (generationLimitState as GenerationLimitState.Success).info
-                    val isLimitReached = info.used >= info.limit
-                    // Calcula o progresso de CONSUMO (quanto já foi usado)
-                    val consumptionPercentage = if (info.limit > 0) info.used.toFloat() / info.limit.toFloat() else 0f
-
-                    // Cores ajustadas para modo claro e escuro
-                    val badgeColor = if (isLimitReached) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF00796B) // Cyan escuro/Verde-azulado para modo claro
-                    }
-                    val badgeBg = if (isDarkTheme) {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                    } else {
-                        Color(0xFFE0E0E0) // Cinza claro com mais contraste no modo claro
-                    }
-
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // Texto com ícone - mostra quantos foram USADOS
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Bolt,
-                                contentDescription = "Energia",
-                                tint = badgeColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "${info.used}/${info.limit}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Barra de progresso horizontal - cresce conforme USO
-                        Box(
-                            modifier = Modifier
-                                .width(100.dp)
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(badgeBg)
-                                .then(
-                                    if (!isDarkTheme) {
-                                        Modifier.border(0.5.dp, Color(0xFFBDBDBD), RoundedCornerShape(4.dp))
-                                    } else Modifier
-                                )
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(consumptionPercentage)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(badgeColor)
-                            )
-                        }
-                    }
-                }
-
-                // BOTÃO DE TEMA
-                IconButton(
-                    onClick = { scope.launch { themeManager.toggleTheme() } },
-                    modifier = Modifier
-                        .size(42.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            CircleShape
-                        )
-                ) {
-                    Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.WbSunny else Icons.Default.DarkMode,
-                        contentDescription = "Alterar Tema",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-        }
-
-        // Linha inferior: Saudação e Nome
-        Spacer(Modifier.height(16.dp))
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                "Olá,",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Text(
-                text = fullName,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        Text(
+            text = fullName,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
+// ===== COMPONENTES EXISTENTES (SEM ALTERAÇÃO) =====
+
 @Composable
 fun SecaoStreak(state: HomeUiState, isDarkTheme: Boolean) {
-    // Azul para o Streak
     val streakColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
 
     Card(
@@ -493,7 +536,6 @@ fun CartaoSessaoEstudo(modifier: Modifier = Modifier, navController: NavControll
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Elemento decorativo
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -565,7 +607,7 @@ fun CartaoProgresso(modifier: Modifier = Modifier, state: HomeUiState) {
             } else {
                 Box(contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
-                        progress = 1f,
+                        progress = { 1f },
                         modifier = Modifier.size(75.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         strokeWidth = 8.dp,
@@ -577,7 +619,7 @@ fun CartaoProgresso(modifier: Modifier = Modifier, state: HomeUiState) {
                         label = "progress"
                     )
                     CircularProgressIndicator(
-                        progress = animatedProgress,
+                        progress = { animatedProgress },
                         modifier = Modifier.size(75.dp),
                         color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 8.dp,
@@ -672,13 +714,11 @@ fun CartaoDeckRecenteModerno(deck: DeckResponse, onClick: () -> Unit) {
                 .padding(18.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Topo: Ícone e Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Ícone do Deck
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -693,12 +733,10 @@ fun CartaoDeckRecenteModerno(deck: DeckResponse, onClick: () -> Unit) {
                     )
                 }
 
-                // Badges (Amarelo + Azul)
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Badge Flashcards (Amarelo)
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = primaryColor.copy(alpha = 0.15f),
@@ -713,7 +751,6 @@ fun CartaoDeckRecenteModerno(deck: DeckResponse, onClick: () -> Unit) {
                         )
                     }
 
-                    // Badge Quiz (Azul)
                     if (deck.hasQuiz) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
@@ -734,7 +771,6 @@ fun CartaoDeckRecenteModerno(deck: DeckResponse, onClick: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
 
-            // Título
             Text(
                 text = deck.filePath,
                 fontWeight = FontWeight.Bold,
@@ -747,7 +783,6 @@ fun CartaoDeckRecenteModerno(deck: DeckResponse, onClick: () -> Unit) {
 
             Spacer(Modifier.height(12.dp))
 
-            // Botão SÓLIDO (Preenchido) para contraste
             Button(
                 onClick = onClick,
                 modifier = Modifier
