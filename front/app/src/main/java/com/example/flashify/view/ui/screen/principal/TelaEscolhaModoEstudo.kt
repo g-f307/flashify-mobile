@@ -275,13 +275,20 @@ fun MainContent(
     val isDarkTheme = isSystemInDarkTheme()
     val quizColor = if (isDarkTheme) Color(0xFF00BCD4) else Color(0xFF0097A7)
 
+    // ✅ USAR DADOS DO DECK SE STATS NÃO ESTIVEREM DISPONÍVEIS
     val quizAttempts = stats?.quiz?.totalAttempts ?: 0
     val quizAverageScore = stats?.quiz?.averageScore ?: 0f
     val quizLastScore = stats?.quiz?.lastScore ?: 0f
     val hasQuizStats = quizAttempts > 0
 
-    val flashcardProgress = stats?.flashcards?.progressPercentage ?: 0f
-    val hasFlashcards = (stats?.flashcards?.total ?: 0) > 0
+    // ✅ USAR DADOS DO DECK SE STATS NÃO ESTIVEREM DISPONÍVEIS
+    val flashcardProgress = stats?.flashcards?.progressPercentage
+        ?: if (deck.totalFlashcards > 0) {
+            (deck.studiedFlashcards.toFloat() / deck.totalFlashcards * 100f)
+        } else 0f
+
+    // ✅ CONSIDERAR QUE DECK TEM FLASHCARDS SE totalFlashcards > 0
+    val hasFlashcards = deck.totalFlashcards > 0
 
     Column(
         modifier = Modifier
@@ -349,7 +356,7 @@ fun MainContent(
             onClick = {
                 navController.navigate("$ESTUDO_SCREEN_ROUTE/$deckId")
             },
-            enabled = hasFlashcards,
+            enabled = hasFlashcards, // ✅ Baseado no deck, não nas stats
             isLocked = !hasFlashcards,
             onCreateContent = onCreateFlashcards,
             isCreating = isCreatingFlashcards,
@@ -368,7 +375,7 @@ fun MainContent(
             onClick = {
                 navController.navigate("$QUIZ_SCREEN_ROUTE/$deckId")
             },
-            enabled = deck.hasQuiz,
+            enabled = deck.hasQuiz, // ✅ Baseado no deck, não nas stats
             isLocked = !deck.hasQuiz,
             onCreateContent = onCreateQuiz,
             isCreating = isCreatingQuiz,

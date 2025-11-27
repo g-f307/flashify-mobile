@@ -142,9 +142,18 @@ class DeckViewModel @Inject constructor(
                 return@launch
             }
 
-            // ✅ 1. Carregar do cache local PRIMEIRO
+            // ✅ 1️⃣ Carregar do cache PRIMEIRO (sempre)
             try {
                 val localDecks = deckDao.getAllDecksForUser(userId).map { it.toDeckResponse() }
+
+                // 🔍 LOG DETALHADO
+                Log.d("DeckViewModel", "🔍 === CACHE DE DECKS ===")
+                Log.d("DeckViewModel", "🔍 User ID: $userId")
+                Log.d("DeckViewModel", "🔍 Total decks: ${localDecks.size}")
+
+                localDecks.take(3).forEachIndexed { index, deck ->
+                    Log.d("DeckViewModel", "🔍 Deck[$index]: id=${deck.id}, title=${deck.filePath}, userId?")
+                }
 
                 if (localDecks.isNotEmpty()) {
                     val recentDeck = localDecks
@@ -155,14 +164,13 @@ class DeckViewModel @Inject constructor(
                     Log.d("DeckViewModel", "📦 ${localDecks.size} decks carregados do cache")
                 }
             } catch (e: Exception) {
-                Log.e("DeckViewModel", "❌ Erro ao ler cache: ${e.message}")
+                Log.e("DeckViewModel", "❌ Erro ao ler cache: ${e.message}", e)
             }
 
-            // ✅ 2. Se estiver ONLINE, sincronizar com servidor
+            // ✅ 2️⃣ Se estiver ONLINE, sincronizar (não bloqueia)
             if (syncManager.isOnline()) {
                 try {
                     val networkDecksResponse = apiService.getDecks(token)
-
                     val recentDeck = networkDecksResponse
                         .filter { it.studiedFlashcards > 0 }
                         .maxByOrNull { it.createdAt }
@@ -177,21 +185,46 @@ class DeckViewModel @Inject constructor(
 
                 } catch (e: Exception) {
                     Log.e("DeckViewModel", "⚠️ Erro na rede: ${e.message}")
-                    // Mantém os dados do cache se a rede falhar
+                    // ✅ Mantém os dados do cache se a rede falhar
                     if (_deckListState.value !is DeckListState.Success) {
                         _deckListState.value = DeckListState.Error("Falha ao conectar. Mostrando dados locais.")
                     }
                 }
             } else {
                 Log.d("DeckViewModel", "📵 Modo offline - usando cache")
+                // ✅ Se não há dados no cache E está offline, mostrar erro claro
+                if ((_deckListState.value as? DeckListState.Success)?.decks.isNullOrEmpty()) {
+                    _deckListState.value = DeckListState.Error(
+                        "Nenhum deck disponível offline. Conecte-se à internet primeiro."
+                    )
+                }
             }
         }
     }
 
+    // DeckViewModel.kt
     fun fetchDeckStats(documentId: Int, showLoading: Boolean = true) {
         viewModelScope.launch {
             if (showLoading) {
                 _deckStatsState.value = DeckStatsState.Loading
+            }
+
+            // ✅ Se estiver OFFLINE, não tentar buscar stats
+            if (!syncManager.isOnline()) {
+                Log.d("DeckViewModel", "📵 Offline - não é possível buscar stats")
+                // ✅ Criar stats vazias para não bloquear a UI
+                _deckStatsState.value = DeckStatsState.Success(
+                    DeckStatsResponse(
+                        flashcards = com.example.flashify.model.data.FlashcardStatsResponse(
+                            known = 0,
+                            learning = 0,
+                            total = 0,
+                            progressPercentage = 0f
+                        ),
+                        quiz = null
+                    )
+                )
+                return@launch
             }
 
             try {
@@ -208,7 +241,18 @@ class DeckViewModel @Inject constructor(
 
             } catch (e: Exception) {
                 Log.e("DeckViewModel", "❌ Erro ao buscar stats: ${e.message}")
-                _deckStatsState.value = DeckStatsState.Error(e.message ?: "Erro ao buscar estatísticas")
+                // ✅ Em caso de erro, não bloquear - usar stats vazias
+                _deckStatsState.value = DeckStatsState.Success(
+                    DeckStatsResponse(
+                        flashcards = com.example.flashify.model.data.FlashcardStatsResponse(
+                            known = 0,
+                            learning = 0,
+                            total = 0,
+                            progressPercentage = 0f
+                        ),
+                        quiz = null
+                    )
+                )
             }
         }
     }

@@ -64,50 +64,75 @@ class QuizViewModel @Inject constructor(
     /**
      * ✅ NOVO: Carregar quiz com suporte offline
      */
+    // QuizViewModel.kt
     fun loadQuiz(documentId: Int) {
         viewModelScope.launch {
             _quizState.value = QuizState.Loading
             val userId = getCurrentUserId()
+
+            Log.d("QuizViewModel", "🔍 === INÍCIO BUSCA QUIZ ===")
+            Log.d("QuizViewModel", "🔍 Document ID: $documentId")
+            Log.d("QuizViewModel", "🔍 User ID: $userId")
+            Log.d("QuizViewModel", "🔍 Online: ${syncManager.isOnline()}")
 
             if (userId == TokenManager.INVALID_USER_ID) {
                 _quizState.value = QuizState.Error("Utilizador inválido")
                 return@launch
             }
 
-            Log.d("QuizViewModel", "🔄 Carregando quiz $documentId para usuário $userId")
-
-            // 1️⃣ Tentar carregar do cache local PRIMEIRO
+            // ✅ 1️⃣ SEMPRE tentar carregar do cache PRIMEIRO
             try {
+                Log.d("QuizViewModel", "🔍 Tentando ler quiz do CACHE...")
+
                 val localQuiz = quizDao.getQuizByDocumentId(documentId, userId)
 
+                Log.d("QuizViewModel", "🔍 Quiz encontrado no cache: ${localQuiz != null}")
+
                 if (localQuiz != null) {
-                    Log.d("QuizViewModel", "📦 Quiz encontrado no CACHE")
+                    Log.d("QuizViewModel", "🔍 Quiz ID: ${localQuiz.id}, Title: ${localQuiz.title}")
+
                     val questions = questionDao.getQuestionsByQuizId(localQuiz.id, userId)
+                    Log.d("QuizViewModel", "🔍 Perguntas encontradas: ${questions.size}")
+
+                    // 🔍 DETALHE DAS PERGUNTAS
+                    questions.take(2).forEachIndexed { index, question ->
+                        val answers = answerDao.getAnswersByQuestionId(question.id, userId)
+                        Log.d("QuizViewModel", "🔍 Pergunta[$index]: id=${question.id}, quizId=${question.quizId}, respostas=${answers.size}")
+                    }
+
                     val quizResponse = localQuiz.toQuizResponse(questions, answerDao, userId)
 
+                    // ✅ MOSTRAR CACHE IMEDIATAMENTE
                     _quizState.value = QuizState.Success(quizResponse)
                     Log.d("QuizViewModel", "✅ Quiz carregado do cache com ${questions.size} perguntas")
 
-                    // Se estiver online, atualizar em background
+                    // ✅ Se estiver ONLINE, atualizar em background
                     if (syncManager.isOnline()) {
+                        Log.d("QuizViewModel", "🔄 Online - atualizando cache em background")
                         loadQuizFromNetwork(documentId, userId, silent = true)
+                    } else {
+                        Log.d("QuizViewModel", "📵 Offline - usando apenas cache")
                     }
                     return@launch
                 } else {
                     Log.d("QuizViewModel", "⚠️ Quiz não encontrado no cache")
                 }
             } catch (e: Exception) {
-                Log.e("QuizViewModel", "❌ Erro ao ler cache: ${e.message}")
+                Log.e("QuizViewModel", "❌ Erro ao ler cache: ${e.message}", e)
             }
 
-            // 2️⃣ Cache vazio - buscar da rede
-            if (syncManager.isOnline()) {
-                loadQuizFromNetwork(documentId, userId, silent = false)
-            } else {
+            // ✅ 2️⃣ Cache vazio - VERIFICAR se está offline
+            if (!syncManager.isOnline()) {
+                Log.w("QuizViewModel", "📵 Offline e SEM CACHE")
                 _quizState.value = QuizState.Error(
-                    "Este quiz não está disponível offline. Conecte-se à internet primeiro."
+                    "Este quiz não está disponível offline. Conecte-se à internet para baixá-lo."
                 )
+                return@launch
             }
+
+            // ✅ 3️⃣ Online e cache vazio - buscar da rede
+            Log.d("QuizViewModel", "🌐 Online e cache vazio - buscando da rede")
+            loadQuizFromNetwork(documentId, userId, silent = false)
         }
     }
 

@@ -52,11 +52,17 @@ class StudyViewModel @Inject constructor(
 
     private fun getCurrentUserId(): Int = tokenManager.getUserId()
 
+    // StudyViewModel.kt
     fun fetchFlashcards(deckId: Int) {
         currentDeckId = deckId
         viewModelScope.launch {
             _studyState.value = StudyState.Loading
             val userId = getCurrentUserId()
+
+            Log.d("StudyViewModel", "🔍 === INÍCIO BUSCA FLASHCARDS ===")
+            Log.d("StudyViewModel", "🔍 Deck ID: $deckId")
+            Log.d("StudyViewModel", "🔍 User ID: $userId")
+            Log.d("StudyViewModel", "🔍 Online: ${syncManager.isOnline()}")
 
             if (userId == TokenManager.INVALID_USER_ID) {
                 _studyState.value = StudyState.Error("Utilizador inválido.")
@@ -64,32 +70,52 @@ class StudyViewModel @Inject constructor(
             }
 
             try {
-                // 1️⃣ PRIMEIRO: Tentar carregar do cache local
+                // ✅ 1️⃣ SEMPRE tentar carregar do cache PRIMEIRO
+                Log.d("StudyViewModel", "🔍 Tentando ler do CACHE...")
+
                 val localFlashcards = flashcardDao.getFlashcardsForDeckForUser(deckId, userId)
-                    .map { it.toFlashcardResponse() }
 
-                if (localFlashcards.isNotEmpty()) {
-                    _studyState.value = StudyState.Success(localFlashcards)
-                    Log.d("StudyViewModel", "📦 ${localFlashcards.size} flashcards carregados do CACHE")
+                Log.d("StudyViewModel", "🔍 Resultado da query no CACHE: ${localFlashcards.size} flashcards")
 
-                    // ✅ Se estiver online, sincronizar em background
+                // 🔍 DETALHE DE CADA FLASHCARD (primeiros 3)
+                localFlashcards.take(3).forEachIndexed { index, flashcard ->
+                    Log.d("StudyViewModel", "🔍 Flashcard[$index]: id=${flashcard.id}, deckId=${flashcard.deckId}, userId=${flashcard.userId}")
+                }
+
+                val flashcardResponses = localFlashcards.map { it.toFlashcardResponse() }
+
+                if (flashcardResponses.isNotEmpty()) {
+                    // ✅ MOSTRAR CACHE IMEDIATAMENTE
+                    _studyState.value = StudyState.Success(flashcardResponses)
+                    Log.d("StudyViewModel", "✅ Flashcards carregados do CACHE (offline-ready)")
+
+                    // ✅ Se estiver ONLINE, atualizar em background (não bloqueia a UI)
                     if (syncManager.isOnline()) {
+                        Log.d("StudyViewModel", "🔄 Online detectado - atualizando cache em background")
                         fetchFlashcardsFromNetwork(deckId, userId, silent = true)
+                    } else {
+                        Log.d("StudyViewModel", "📵 Offline - usando apenas cache")
                     }
+                    return@launch
+                } else {
+                    Log.w("StudyViewModel", "⚠️ Cache vazio - ${localFlashcards.size} flashcards encontrados")
+                }
+
+                // ✅ 2️⃣ Cache vazio - VERIFICAR se está offline
+                if (!syncManager.isOnline()) {
+                    Log.w("StudyViewModel", "📵 Offline e SEM CACHE - não é possível buscar")
+                    _studyState.value = StudyState.Error(
+                        "Estes flashcards não estão disponíveis offline. Conecte-se à internet para baixá-los."
+                    )
                     return@launch
                 }
 
-                // 2️⃣ Cache vazio - buscar da rede
-                Log.d("StudyViewModel", "⚠️ Cache vazio, buscando da rede...")
-                if (syncManager.isOnline()) {
-                    fetchFlashcardsFromNetwork(deckId, userId, silent = false)
-                } else {
-                    _studyState.value = StudyState.Error(
-                        "Este deck não possui flashcards em cache. Conecte-se à internet primeiro."
-                    )
-                }
+                // ✅ 3️⃣ Online e cache vazio - buscar da rede
+                Log.d("StudyViewModel", "🌐 Online e cache vazio - buscando da rede")
+                fetchFlashcardsFromNetwork(deckId, userId, silent = false)
+
             } catch (e: Exception) {
-                Log.e("StudyViewModel", "❌ Erro crítico: ${e.message}")
+                Log.e("StudyViewModel", "❌ Erro crítico: ${e.message}", e)
                 _studyState.value = StudyState.Error("Erro ao carregar flashcards: ${e.message}")
             }
         }

@@ -69,6 +69,12 @@ class HomeViewModel @Inject constructor(
             initialValue = ConnectivityState()
         )
 
+    // ✅ Método público para forçar sincronização
+    fun forceSyncNow() {
+        Log.d("HomeViewModel", "🔄 forceSyncNow chamado")
+        syncManager.forceSyncNow()
+    }
+
     // --- 2. BLOCO DE INICIALIZAÇÃO (Executa DEPOIS das variáveis existirem) ---
 
     init {
@@ -77,12 +83,6 @@ class HomeViewModel @Inject constructor(
     }
 
     // --- 3. FUNÇÕES PÚBLICAS E LÓGICA ---
-
-    // ✅ Método público para sincronizar (chamado pela UI)
-    fun forceSyncNow() {
-        Log.d("HomeViewModel", "🔄 forceSyncNow chamado")
-        syncManager.forceSyncNow()
-    }
 
     fun addStudyTime(seconds: Int) {
         _timeStudiedToday.value += seconds
