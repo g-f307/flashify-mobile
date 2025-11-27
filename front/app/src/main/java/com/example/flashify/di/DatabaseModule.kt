@@ -27,46 +27,56 @@ object DatabaseModule {
             .build()
     }
 
-    // ===== DAOs EXISTENTES =====
+    // ===== USER DAO ✅ NOVO =====
+    @Provides
+    @Singleton
+    fun provideUserDao(database: AppDatabase): UserDao {
+        return database.userDao()
+    }
 
+    // ===== DECK DAO =====
     @Provides
     @Singleton
     fun provideDeckDao(database: AppDatabase): DeckDao {
         return database.deckDao()
     }
 
+    // ===== FLASHCARD DAO =====
     @Provides
     @Singleton
     fun provideFlashcardDao(database: AppDatabase): FlashcardDao {
         return database.flashcardDao()
     }
 
-    // ===== NOVOS DAOs PARA QUIZ =====
-
+    // ===== QUIZ DAO =====
     @Provides
     @Singleton
     fun provideQuizDao(database: AppDatabase): QuizDao {
         return database.quizDao()
     }
 
+    // ===== QUESTION DAO =====
     @Provides
     @Singleton
     fun provideQuestionDao(database: AppDatabase): QuestionDao {
         return database.questionDao()
     }
 
+    // ===== ANSWER DAO =====
     @Provides
     @Singleton
     fun provideAnswerDao(database: AppDatabase): AnswerDao {
         return database.answerDao()
     }
 
+    // ===== QUIZ ATTEMPT DAO =====
     @Provides
     @Singleton
     fun provideQuizAttemptDao(database: AppDatabase): QuizAttemptDao {
         return database.quizAttemptDao()
     }
 
+    // ===== STUDY LOG DAO =====
     @Provides
     @Singleton
     fun provideStudyLogDao(database: AppDatabase): StudyLogDao {

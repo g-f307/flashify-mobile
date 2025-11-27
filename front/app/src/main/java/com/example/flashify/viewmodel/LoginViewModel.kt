@@ -1,7 +1,9 @@
 package com.example.flashify.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.flashify.model.manager.LocalUserManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.network.ApiService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,7 +34,8 @@ enum class ErrorType {
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val tokenManager: TokenManager,
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val localUserManager: LocalUserManager  // ✅ NOVO
 ) : ViewModel() {
 
     private val _loginState = MutableStateFlow<LoginUIState>(LoginUIState.Idle)
@@ -50,6 +53,10 @@ class LoginViewModel @Inject constructor(
 
                 val userResponse = apiService.getCurrentUser(token)
                 val userId = userResponse.id
+
+                // ✅ NOVO: Salvar usuário localmente
+                localUserManager.saveUser(userResponse)
+                Log.d("LoginViewModel", "✅ Usuário salvo no cache local")
 
                 tokenManager.saveAuthData(tokenResponse.accessToken, userId)
 
@@ -103,6 +110,11 @@ class LoginViewModel @Inject constructor(
     }
 
     fun logout() {
-        tokenManager.clearAuthData()
+        viewModelScope.launch {
+            tokenManager.clearAuthData()
+            // ✅ NOVO: Limpar usuário do cache ao fazer logout
+            localUserManager.clearLocalUser()
+            Log.d("LoginViewModel", "✅ Logout - Cache de usuário limpo")
+        }
     }
 }

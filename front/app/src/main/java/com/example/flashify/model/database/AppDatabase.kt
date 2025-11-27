@@ -10,10 +10,11 @@ import com.example.flashify.model.database.dataclass.*
 /**
  * Database principal da aplicação com suporte completo a Offline-First
  *
- * Versão 3: Adicionadas tabelas de Quiz, tentativas e logs de sincronização
+ * Versão 4: Adicionada tabela de usuários para cache de dados do perfil
  */
 @Database(
     entities = [
+        UserEntity::class,              // ✅ NOVO na v4
         DeckEntity::class,
         FlashcardEntity::class,
         QuizEntity::class,
@@ -22,16 +23,15 @@ import com.example.flashify.model.database.dataclass.*
         QuizAttemptEntity::class,
         StudyLogEntity::class
     ],
-    version = 3,
+    version = 4,                        // ⬆️ ATUALIZADO
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     // DAOs existentes
+    abstract fun userDao(): UserDao                     // ✅ NOVO
     abstract fun deckDao(): DeckDao
     abstract fun flashcardDao(): FlashcardDao
-
-    // Novos DAOs para Quiz
     abstract fun quizDao(): QuizDao
     abstract fun questionDao(): QuestionDao
     abstract fun answerDao(): AnswerDao
@@ -49,8 +49,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "flashify_database"
                 )
-                    // Estratégia de migração destrutiva (para desenvolvimento)
-                    // Em produção, use Migrations adequadas
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
@@ -58,9 +56,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * Limpa a instância do database (útil para testes)
-         */
         fun clearInstance() {
             INSTANCE?.close()
             INSTANCE = null

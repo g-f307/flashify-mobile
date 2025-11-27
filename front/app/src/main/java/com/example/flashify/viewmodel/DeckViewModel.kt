@@ -13,6 +13,7 @@ import com.example.flashify.model.data.TextDeckCreateRequest
 import com.example.flashify.model.database.dao.DeckDao
 import com.example.flashify.model.database.dao.FlashcardDao
 import com.example.flashify.model.database.dataclass.DeckEntity
+import com.example.flashify.model.manager.LocalUserManager
 import com.example.flashify.model.manager.SyncManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.network.ApiService
@@ -84,7 +85,8 @@ class DeckViewModel @Inject constructor(
     private val deckDao: DeckDao,
     private val flashcardDao: FlashcardDao,
     private val contentResolver: ContentResolver,
-    private val syncManager: SyncManager // ✅ NOVO: Injeção do SyncManager
+    private val syncManager: SyncManager,
+    private val localUserManager: LocalUserManager// ✅ NOVO: Injeção do SyncManager
 ) : ViewModel() {
 
     private val _deckListState = MutableStateFlow<DeckListState>(DeckListState.Loading)
