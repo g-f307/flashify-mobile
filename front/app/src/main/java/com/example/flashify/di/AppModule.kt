@@ -16,6 +16,13 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
+    // ===== PROFILE IMAGE MANAGER =====
+    @Provides
+    @Singleton
+    fun provideProfileImageManager(@ApplicationContext context: Context): ProfileImageManager {
+        return ProfileImageManager(context)
+    }
+
     // ===== TOKEN MANAGER =====
     @Provides
     @Singleton

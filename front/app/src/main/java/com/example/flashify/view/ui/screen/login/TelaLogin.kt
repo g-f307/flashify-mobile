@@ -47,13 +47,16 @@ fun TelaLogin(navController: NavController) {
     val loginState by loginViewModel.loginState.collectAsStateWithLifecycle()
     val socialLoginState by socialLoginViewModel.socialLoginState.collectAsStateWithLifecycle()
 
+    // ✅ CORRIGIDO: Observa mudanças no loginState
     LaunchedEffect(loginState) {
         when (val state = loginState) {
             is LoginUIState.Success -> {
                 Toast.makeText(context, "Login bem-sucedido!", Toast.LENGTH_SHORT).show()
                 loginViewModel.resetState()
+
+                // ✅ Navega para tela principal
                 navController.navigate(MAIN_SCREEN_ROUTE) {
-                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    popUpTo(0) { inclusive = true } // Remove toda a pilha de navegação
                     launchSingleTop = true
                 }
             }
@@ -66,18 +69,21 @@ fun TelaLogin(navController: NavController) {
         }
     }
 
+    // ✅ CORRIGIDO: Observa mudanças no socialLoginState
     LaunchedEffect(socialLoginState) {
         when (val state = socialLoginState) {
             is SocialLoginUIState.Success -> {
                 Toast.makeText(context, "Login com Google bem-sucedido!", Toast.LENGTH_SHORT).show()
                 socialLoginViewModel.resetState()
+
+                // ✅ Navega para tela principal
                 navController.navigate(MAIN_SCREEN_ROUTE) {
-                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    popUpTo(0) { inclusive = true } // Remove toda a pilha de navegação
                     launchSingleTop = true
                 }
             }
             is SocialLoginUIState.Error -> {
-                Toast.makeText(context, "Erro no login com Google", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
                 socialLoginViewModel.resetState()
             }
             else -> {}
@@ -88,17 +94,17 @@ fun TelaLogin(navController: NavController) {
         modifier = Modifier
             .fillMaxSize()
             .background(CyanFlashify)
-            .imePadding() // AJUSTA QUANDO O TECLADO APARECE
+            .imePadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header com 40% da tela (reduzido para caber tudo)
+            // Header com 40% da tela
             AuthHeaderSection(
                 title = "Bem-vindo de volta",
                 subtitle = "ao Flashify",
                 proportion = 0.40f
             )
 
-            // Formulário - SEM SCROLL, TUDO DEVE CABER NA TELA
+            // Formulário
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -111,7 +117,7 @@ fun TelaLogin(navController: NavController) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()) // SCROLL PARA QUANDO TECLADO APARECE
+                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 24.dp, vertical = 20.dp)
                         .navigationBarsPadding(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -208,13 +214,16 @@ fun TelaLogin(navController: NavController) {
                         )
                     }
 
+                    // ✅ Botão de login com Google
                     SocialLoginButton(
                         iconRes = R.drawable.ic_google_logo,
-                        onClick = { socialLoginViewModel.signInWithGoogle() },
+                        onClick = {
+                            socialLoginViewModel.signInWithGoogle()
+                        },
                         isLoading = socialLoginState is SocialLoginUIState.Loading
                     )
 
-                    // LINK PARA REGISTRO - COMPACTO E SEM ESPAÇOS EXTRAS
+                    // Link para registro
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
@@ -233,6 +242,35 @@ fun TelaLogin(navController: NavController) {
                             modifier = Modifier.clickable {
                                 navController.navigate(REGISTER_SCREEN_ROUTE)
                             }
+                        )
+                    }
+                }
+            }
+        }
+
+        // ✅ OVERLAY DE LOADING para Google Login
+        if (socialLoginState is SocialLoginUIState.Loading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable(enabled = false) { }, // Bloqueia interações
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(color = CyanFlashify)
+                        Text(
+                            "Autenticando com Google...",
+                            fontWeight = FontWeight.Medium,
+                            color = DarkText
                         )
                     }
                 }

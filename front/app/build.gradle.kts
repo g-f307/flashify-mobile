@@ -97,8 +97,11 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
-    // ✅ HILT - ADICIONAR
+    // ✅ HILT
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+
+    // COIL
+    implementation("io.coil-kt:coil-compose:2.5.0")
 }

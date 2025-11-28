@@ -44,6 +44,7 @@ import com.example.flashify.view.ui.components.CompactConnectivityIndicator
 import com.example.flashify.view.ui.components.ConnectivityBanner
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
+import com.example.flashify.view.ui.components.ProfileAvatar
 import com.example.flashify.viewmodel.*
 import kotlinx.coroutines.launch
 
@@ -222,41 +223,23 @@ fun TelaPrincipal(
 }
 
 // ===== COMPONENTES SEPARADOS PARA MELHOR ORGANIZAÇÃO =====
-
 @Composable
 private fun AvatarSection(
     settingsViewModel: SettingsViewModel
 ) {
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
-    val primaryColor = MaterialTheme.colorScheme.primary
 
-    val initial = when (val state = userState) {
-        is UserState.Success -> state.user.username.firstOrNull()?.uppercaseChar()?.toString()
-        else -> "U"
+    val username = when (val state = userState) {
+        is UserState.Success -> state.user.username
+        else -> null
     }
 
-    Box(
-        modifier = Modifier
-            .size(64.dp)
-            .clip(CircleShape)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        primaryColor.copy(alpha = 0.3f),
-                        primaryColor.copy(alpha = 0.15f)
-                    )
-                )
-            )
-            .border(2.dp, primaryColor.copy(alpha = 0.4f), CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = initial ?: "U",
-            fontWeight = FontWeight.ExtraBold,
-            color = primaryColor,
-            fontSize = 28.sp
-        )
-    }
+    ProfileAvatar(
+        username = username,
+        size = 64.dp,
+        fontSize = 28,
+        borderWidth = 2.dp
+    )
 }
 
 @Composable

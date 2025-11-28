@@ -25,11 +25,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.flashify.model.data.NavItem
+import com.example.flashify.model.manager.ProfileImageManager
 import com.example.flashify.model.manager.ThemeManager
 import com.example.flashify.model.manager.TokenManager
 import com.example.flashify.model.util.*
 import com.example.flashify.view.ui.components.GradientBackgroundScreen
 import com.example.flashify.view.ui.components.NavegacaoBotaoAbaixo
+import com.example.flashify.view.ui.components.ProfileAvatarWithIcon
 import com.example.flashify.viewmodel.SettingsViewModel
 import com.example.flashify.viewmodel.UserState
 import kotlinx.coroutines.launch
@@ -47,6 +49,7 @@ fun TelaPrincipalConfiguracao(
     val isDarkTheme by themeManager.isDarkTheme.collectAsState(initial = isSystemInDarkTheme())
 
     val tokenManager = remember { TokenManager(context) }
+    val profileImageManager = remember { ProfileImageManager(context) } // ✅ NOVO
     val userState by settingsViewModel.userState.collectAsStateWithLifecycle()
 
     // Cores do Tema
@@ -115,7 +118,7 @@ fun TelaPrincipalConfiguracao(
                     }
                 }
 
-                // Profile Card
+                // Profile Card ✅ ATUALIZADO
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -143,20 +146,14 @@ fun TelaPrincipalConfiguracao(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(64.dp)
-                                                .clip(CircleShape)
-                                                .background(primaryColor.copy(alpha = 0.2f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.AccountCircle,
-                                                contentDescription = "Foto de Perfil",
-                                                modifier = Modifier.size(40.dp),
-                                                tint = primaryColor
-                                            )
-                                        }
+                                        // ✅ ALTERADO: Usando o novo componente ProfileAvatarWithIcon
+                                        ProfileAvatarWithIcon(
+                                            username = user.username,
+                                            size = 64.dp,
+                                            iconSize = 40.dp,
+                                            borderWidth = 2.dp
+                                        )
+
                                         Column {
                                             Text(
                                                 user.username,
@@ -249,13 +246,16 @@ fun TelaPrincipalConfiguracao(
                     }
                 }
 
-                // Logout Button
+                // Logout Button ✅ ATUALIZADO
                 item {
                     OutlinedButton(
                         onClick = {
-                            tokenManager.clearToken()
-                            navController.navigate(LOGIN_SCREEN_ROUTE) {
-                                popUpTo(0) { inclusive = true }
+                            scope.launch {
+                                tokenManager.clearToken()
+                                profileImageManager.clearProfileImage() // ✅ LIMPAR FOTO
+                                navController.navigate(LOGIN_SCREEN_ROUTE) {
+                                    popUpTo(0) { inclusive = true }
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
