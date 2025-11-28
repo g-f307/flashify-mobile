@@ -235,9 +235,15 @@ fun TelaPrincipalConfiguracao(
                             )
                             Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             ConfiguracaoClickItem(
-                                icon = Icons.Default.Description,
-                                text = "Termos de Uso",
-                                onClick = { /* TODO */ }
+                                icon = Icons.Default.Memory,
+                                text = "Consumo de IA",
+                                onClick = { navController.navigate(CONSUMO_IA_ROUTE) }
+                            )
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            ConfiguracaoClickItem(
+                                icon = Icons.Default.MenuBook,
+                                text = "Manual do Usuário",
+                                onClick = { navController.navigate(MANUAL_USUARIO_ROUTE) }
                             )
                         }
                     }

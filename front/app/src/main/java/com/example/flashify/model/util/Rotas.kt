@@ -20,6 +20,8 @@ import com.example.flashify.view.ui.screen.principal.TelaEscolhaModoEstudo
 import com.example.flashify.view.ui.screen.principal.TelaDetalhePasta
 import com.example.flashify.view.ui.screen.principal.TelaContentLoader
 import com.example.flashify.view.ui.screen.landing.TelaLanding
+import com.example.flashify.view.ui.screen.principal.TelaManualUsuario
+import com.example.flashify.view.ui.screen.principal.TelaConsumoIA
 
 
 // Importando o TokenManager
@@ -42,6 +44,8 @@ const val ESCOLHA_MODO_ESTUDO_ROUTE = "escolha_modo_estudo_route"
 const val DETALHE_PASTA_ROUTE = "detalhe_pasta_route"
 const val CONTENT_LOADER_ROUTE = "content_loader_route"
 const val CENTRAL_AJUDA_ROUTE = "central_ajuda"
+const val MANUAL_USUARIO_ROUTE = "manual_usuario"
+const val CONSUMO_IA_ROUTE = "consumo_ia"
 
 
 @Composable
@@ -55,10 +59,10 @@ fun AppNavigation() {
     // 3. Define a rota inicial com base na existência do token
     val startDestination =
         if (token != null && token.startsWith("Bearer ")) {
-        MAIN_SCREEN_ROUTE
-    } else {
-        LANDING_SCREEN_ROUTE // ✅ MUDANÇA AQUI (era LOGIN_SCREEN_ROUTE)
-    }
+            MAIN_SCREEN_ROUTE
+        } else {
+            LANDING_SCREEN_ROUTE // ✅ MUDANÇA AQUI (era LOGIN_SCREEN_ROUTE)
+        }
 
     NavHost(
         navController = navController,
@@ -150,7 +154,15 @@ fun AppNavigation() {
         composable(CENTRAL_AJUDA_ROUTE) {
             TelaCentralAjuda(navController = navController)
         }
-        
+
+        composable(MANUAL_USUARIO_ROUTE) {
+            TelaManualUsuario(navController = navController)
+        }
+
+        composable(CONSUMO_IA_ROUTE) {
+            TelaConsumoIA(navController = navController)
+        }
+
         composable(
             route = "$CONTENT_LOADER_ROUTE/{documentId}/{generatesFlashcards}/{generatesQuizzes}",
             arguments = listOf(
@@ -173,4 +185,3 @@ fun AppNavigation() {
         }
     }
 }
-
