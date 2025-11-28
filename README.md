@@ -572,7 +572,7 @@ Desenvolvido por:
 - **Gabriel Fernandes** - *Full Stack Developer* - [GitHub](https://github.com/g-f307) | [LinkedIn](https://www.linkedin.com/in/gabriel-fernandes-7684b4220/)
 - **Carlos Eduardo Souza** - *Front-end Developer*
 - **Rebecca Souza Xavier** - *UX/UI Designer*
-- **Yasmim Pessoa da Frota**- *UX/UI Designer*
+- **Yasmim Pessoa da Frota** - *UX/UI Designer*
 
 ---
 
