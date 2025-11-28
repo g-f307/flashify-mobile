@@ -1,4 +1,5 @@
-# ⚡ Flashify Mobile
+# <img alt="Flashify Logo" height="45" style="vertical-align: middle; margin-right: 8px;" src="https://github.com/user-attachments/assets/6af903aa-cc5c-4bb5-8a60-af64c918de98" /> Flashify Mobile
+
 
 <div align="center">
 
