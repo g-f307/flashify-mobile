@@ -150,10 +150,10 @@ fun StatItem(
 fun MotivationalHeader(score: Float) {
     val (icon, iconColor, title, subtitle) = remember(score) {
         when {
-            score >= 90 -> Tuple4(Icons.Default.Star, Color(0xFFFFD700), "Excelente!", "Dominaste este conteúdo!")
+            score >= 90 -> Tuple4(Icons.Default.Star, Color(0xFFFFD700), "Excelente!", "Você domina o conteúdo!")
             score >= 70 -> Tuple4(Icons.Default.CheckCircle, Color(0xFF4CAF50), "Muito bem!", "Ótimo resultado!")
-            score >= 50 -> Tuple4(Icons.Default.ThumbUp, YellowAccent, "Bom esforço", "Estás no caminho certo.")
-            else -> Tuple4(Icons.Default.TrendingUp, Color(0xFF2196F3), "Continua a estudar", "A prática leva à perfeição.")
+            score >= 50 -> Tuple4(Icons.Default.ThumbUp, YellowAccent, "Bom esforço", "Você está no caminho certo.")
+            else -> Tuple4(Icons.Default.TrendingUp, Color(0xFF2196F3), "Continue estudando", "A prática leva à perfeição.")
         }
     }
     Row(

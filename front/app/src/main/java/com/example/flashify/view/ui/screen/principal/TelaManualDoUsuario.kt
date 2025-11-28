@@ -74,7 +74,7 @@ fun TelaManualUsuario(navController: NavController) {
                 )
             ),
             ManualSection(
-                title = "Fazendo Quizzes",
+                title = "Estudando com Quizzes",
                 icon = Icons.Default.Quiz,
                 steps = listOf(
                     ManualStep(1, "Acesse o quiz", "Selecione um deck que possua quiz e escolha a opção \"Fazer Quiz\".", Icons.Default.PlayArrow),
@@ -91,7 +91,7 @@ fun TelaManualUsuario(navController: NavController) {
                     ManualStep(1, "Acesse a Biblioteca", "Clique no ícone de biblioteca na barra de navegação.", Icons.Default.LibraryBooks),
                     ManualStep(2, "Crie uma pasta", "Toque no botão \"+\" para criar uma nova pasta de organização.", Icons.Default.CreateNewFolder),
                     ManualStep(3, "Nomeie a pasta", "Escolha um nome descritivo para sua pasta (ex: \"Matemática\").", Icons.Default.DriveFileRenameOutline),
-                    ManualStep(4, "Mova decks para pastas", "Arraste decks para as pastas ou use o menu de opções.", Icons.Default.DriveFileMove),
+                    ManualStep(4, "Mova decks para pastas", "Use o menu de opções para mover sua pasta até o caminho desejado.", Icons.Default.DriveFileMove),
                     ManualStep(5, "Gerencie suas pastas", "Renomeie, delete ou reorganize suas pastas conforme necessário.", Icons.Default.Settings)
                 )
             ),
